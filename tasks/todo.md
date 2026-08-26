@@ -22,7 +22,7 @@
 ### 🔹 Day 1 — Architecture & Environment Setup (Tuesday, Aug 25, 2026)
 **Goal**: Establish zero-ambiguity foundation, create repository architecture, and provision dev environment.
 - [x] **Morning (Research)**: Read full R&D document end-to-end; highlight unknowns, guardrails, and stopping rules.
-- [x] **Morning (Build)**: Set up project repository structure: `/agent`, `/api-integration`, `/ml`, `/tests`, `/scripts`.
+- [x] **Morning (Build)**: Set up project repository structure: `/agent`, `/api_integration`, `/ml`, `/tests`, `/scripts`.
 - [x] **Morning (Build)**: Provision development environment: Python 3.10+, Docker (`Dockerfile`, `docker-compose.yml`), `requirements.txt`, `.env.example`.
 - [x] **Afternoon (Review)**: Define MVP scope: Revenue Recovery Agent only (Fraud & Dynamic Pricing deferred to future).
 - [x] **Afternoon (Review)**: Draft `tasks/todo.md` with all 10-day milestones and daily checkpoints.
@@ -32,12 +32,12 @@
 
 ### 🔹 Day 2 — Data Pipeline & Razorpay Integration (Wednesday, Aug 26, 2026)
 **Goal**: Build real-time webhook listeners, data ingestion layer, and local SQL transaction storage.
-- [ ] **Morning (Build)**: Implement Razorpay webhook listener — capture `payment.failed`, `order.paid`, `payment.authorized`, `subscription.halted`, `invoice.overdue`.
-- [ ] **Morning (Build)**: Build data ingestion layer to normalize raw webhook payloads into standard internal schema.
+- [x] **Morning (Build)**: Implement Razorpay webhook listener — capture `payment.failed`, `order.paid`, `payment.authorized`, `subscription.halted`, `invoice.overdue`.
+- [x] **Morning (Build)**: Build data ingestion layer to normalize raw webhook payloads into standard internal schema.
 - [ ] **Morning (Build)**: Set up local DB (SQLite with WAL mode / PostgreSQL) for transactions, failure reasons, and audit logs.
 - [ ] **Afternoon (Research)**: Synthesize / pull 90-day historical failure data (50+ records) for ML training & validation.
 - [ ] **Afternoon (Research)**: Map all Razorpay error codes (`BAD_REQUEST_ERROR`, `GATEWAY_ERROR`, `insufficient_funds`, `card_blocked`, `network_timeout`).
-- [ ] **Afternoon (Test)**: Write unit tests for webhook parsing and data normalization across all 3 event streams.
+- [x] **Afternoon (Test)**: Write unit tests for webhook parsing and data normalization across all 3 event streams.
 
 ---
 

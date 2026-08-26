@@ -48,7 +48,7 @@ services:
       - ./data:/app/data
       - ./frontend:/app/frontend
       - ./agent:/app/agent
-      - ./api-integration:/app/api-integration
+      - ./api_integration:/app/api_integration
       - ./ml:/app/ml
     restart: unless-stopped
     healthcheck:

@@ -25,6 +25,8 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+from api_integration import webhook_router
+
 # Enable CORS for local development and dashboard UI
 app.add_middleware(
     CORSMiddleware,
@@ -33,6 +35,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Register API routers
+app.include_router(webhook_router)
+
 
 @app.get("/")
 def root():

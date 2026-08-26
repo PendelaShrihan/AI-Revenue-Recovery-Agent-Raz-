@@ -24,7 +24,7 @@ The **AI Revenue Recovery Agent** bridges this gap:
 .
 ├── agent/                # LLM diagnostic engine, prompt templates, bounded state machine & actions
 │   └── __init__.py
-├── api-integration/      # Webhook ingestion endpoints, payload parsers & Razorpay sandbox client
+├── api_integration/      # Webhook ingestion endpoints, payload parsers & Razorpay sandbox client
 │   └── __init__.py
 ├── ml/                   # ML failure classifiers, feature engineering & retry timing predictors
 │   └── __init__.py
