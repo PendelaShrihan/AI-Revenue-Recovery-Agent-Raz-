@@ -98,6 +98,13 @@ async def handle_razorpay_webhook(request: Request):
             detail=f"Payload normalization error: {str(val_err)}"
         )
 
+    # Persist transaction to database (PostgreSQL)
+    try:
+        from agent.db_writer import save_transaction
+        save_transaction(normalized_event)
+    except Exception as db_err:
+        logger.error(f"Database persistence error in webhook handler: {db_err}", exc_info=True)
+
     # Route event based on type and category
     event_type = normalized_event.event_type
     action_taken = "event_acknowledged"

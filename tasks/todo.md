@@ -34,9 +34,9 @@
 **Goal**: Build real-time webhook listeners, data ingestion layer, and local SQL transaction storage.
 - [x] **Morning (Build)**: Implement Razorpay webhook listener — capture `payment.failed`, `order.paid`, `payment.authorized`, `subscription.halted`, `invoice.overdue`.
 - [x] **Morning (Build)**: Build data ingestion layer to normalize raw webhook payloads into standard internal schema.
-- [ ] **Morning (Build)**: Set up local DB (SQLite with WAL mode / PostgreSQL) for transactions, failure reasons, and audit logs.
-- [ ] **Afternoon (Research)**: Synthesize / pull 90-day historical failure data (50+ records) for ML training & validation.
-- [ ] **Afternoon (Research)**: Map all Razorpay error codes (`BAD_REQUEST_ERROR`, `GATEWAY_ERROR`, `insufficient_funds`, `card_blocked`, `network_timeout`).
+- [x] **Morning (Build)**: Set up local DB (SQLite with WAL mode / PostgreSQL) for transactions, failure reasons, and audit logs (`agent/db_writer.py`).
+- [x] **Afternoon (Research)**: Synthesize / pull 90-day historical failure data (50+ records) for ML training & validation (`scripts/pull_historical_data.py`).
+- [x] **Afternoon (Research)**: Map all Razorpay error codes (`BAD_REQUEST_ERROR`, `GATEWAY_ERROR`, `insufficient_funds`, `card_blocked`, `network_timeout`) (`ml/error_codes.py`).
 - [x] **Afternoon (Test)**: Write unit tests for webhook parsing and data normalization across all 3 event streams.
 
 ---
