@@ -13,7 +13,8 @@ from sqlalchemy import (
     Text,
     DateTime,
     ForeignKey,
-    Numeric
+    Numeric,
+    UniqueConstraint
 )
 from sqlalchemy.orm import declarative_base, relationship
 
@@ -24,11 +25,12 @@ class Transaction(Base):
     """
     Transactions table model.
     Stores core transaction state, failure reasons, and recovery progress.
+    Enforces UNIQUE constraint on razorpay_payment_id to prevent duplicate inserts at DB level.
     """
     __tablename__ = "transactions"
 
     id = Column(String(64), primary_key=True, index=True)
-    razorpay_payment_id = Column(String(64), nullable=False, index=True)
+    razorpay_payment_id = Column(String(64), nullable=False, unique=True, index=True)
     merchant_id = Column(String(64), nullable=False, index=True)
     amount = Column(Float, nullable=False)
     currency = Column(String(10), default="INR", nullable=False)
@@ -73,8 +75,17 @@ class RetryAttempt(Base):
     """
     Retry Attempts table model.
     Tracks each automated recovery retry execution and outcomes (enforces max 2 attempts).
+
+    NOTE ON ATTEMPT INDEXING:
+    `attempt_number` (and its alias property `attempt_index`) strictly counts
+    the sequential retry attempts executed by the recovery agent (1 for 1st retry,
+    2 for 2nd retry). It does NOT include the initial failure transaction
+    (which is stored in the parent `transactions` table).
     """
     __tablename__ = "retry_attempts"
+    __table_args__ = (
+        UniqueConstraint("transaction_id", "attempt_number", name="uq_retry_attempts_tx_attempt"),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     transaction_id = Column(String(64), ForeignKey("transactions.id", ondelete="CASCADE"), nullable=False, index=True)
@@ -86,11 +97,17 @@ class RetryAttempt(Base):
     # Relationship
     transaction = relationship("Transaction", back_populates="retry_attempts")
 
+    @property
+    def attempt_index(self) -> int:
+        """Alias for attempt_number: tracks retry attempts performed (1 or 2)."""
+        return self.attempt_number
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "id": self.id,
             "transaction_id": self.transaction_id,
             "attempt_number": self.attempt_number,
+            "attempt_index": self.attempt_index,
             "attempted_at": self.attempted_at.isoformat() if self.attempted_at else None,
             "result": self.result,
             "next_retry_at": self.next_retry_at.isoformat() if self.next_retry_at else None

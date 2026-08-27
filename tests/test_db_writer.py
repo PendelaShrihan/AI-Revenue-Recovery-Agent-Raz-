@@ -206,6 +206,82 @@ class TestDBWriter(unittest.TestCase):
         found = self.session.query(Transaction).filter_by(id="tx_rollback_01").first()
         self.assertIsNone(found)
 
+    def test_attempt_index_tracks_retries_performed_not_initial_tx(self):
+        """
+        Explicitly verifies that attempt_number / attempt_index tracks the count
+        of retry attempts performed (1 for 1st retry, 2 for 2nd retry) and that
+        the parent Transaction represents the baseline initial failure (0 retries).
+        """
+        event = self._create_sample_event(payment_id="pay_attempt_track_01", amount=1200.0)
+        tx, is_created = save_transaction(event, session=self.session)
+        self.session.commit()
+
+        self.assertTrue(is_created)
+        # Baseline initial failure: 0 retries performed yet
+        self.assertEqual(tx.to_dict()["retry_count"], 0)
+        self.assertEqual(len(tx.retry_attempts), 0)
+
+        # 1st retry performed
+        retry1 = save_retry_attempt(
+            transaction_id=tx.id,
+            attempt_number=1,
+            result="FAILED",
+            next_retry_at=datetime.utcnow(),
+            session=self.session
+        )
+        self.session.commit()
+
+        self.assertEqual(retry1.attempt_number, 1)
+        self.assertEqual(retry1.attempt_index, 1)
+        self.assertEqual(retry1.to_dict()["attempt_index"], 1)
+        self.session.refresh(tx)
+        self.assertEqual(tx.to_dict()["retry_count"], 1)
+
+        # 2nd retry performed
+        retry2 = save_retry_attempt(
+            transaction_id=tx.id,
+            attempt_number=2,
+            result="SUCCESS",
+            session=self.session
+        )
+        self.session.commit()
+
+        self.assertEqual(retry2.attempt_number, 2)
+        self.assertEqual(retry2.attempt_index, 2)
+        self.assertEqual(retry2.to_dict()["attempt_index"], 2)
+        self.session.refresh(tx)
+        self.assertEqual(tx.to_dict()["retry_count"], 2)
+
+    def test_database_level_unique_constraint_enforced(self):
+        """
+        Verifies that SQLite/PostgreSQL rejects direct concurrent duplicate inserts
+        on razorpay_payment_id at the DB level with IntegrityError.
+        """
+        from sqlalchemy.exc import IntegrityError
+
+        tx1 = Transaction(
+            id="tx_uniq_001",
+            razorpay_payment_id="pay_UNIQUE_100",
+            merchant_id="acc_test",
+            amount=999.0,
+            status="FAILED"
+        )
+        self.session.add(tx1)
+        self.session.commit()
+
+        # Direct duplicate insert must fail at SQL constraint level
+        tx2 = Transaction(
+            id="tx_uniq_002",
+            razorpay_payment_id="pay_UNIQUE_100",  # Duplicate payment_id
+            merchant_id="acc_test",
+            amount=999.0,
+            status="FAILED"
+        )
+        self.session.add(tx2)
+        with self.assertRaises(IntegrityError):
+            self.session.commit()
+        self.session.rollback()
+
 
 if __name__ == "__main__":
     unittest.main()

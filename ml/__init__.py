@@ -31,8 +31,14 @@ from ml.classifier import (
     BalancedXGBClassifier,
     CATEGORY_LABELS,
 )
+from ml.retry_predictor import (
+    RetryTimingPredictor,
+    RetryTimingRecommendation,
+    RecoveryAction,
+    BASE_RETRY_DELAYS,
+)
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 __all__ = [
     # Error codes & rule-based classifier
@@ -56,4 +62,9 @@ __all__ = [
     "FailureClassifier",
     "BalancedXGBClassifier",
     "CATEGORY_LABELS",
+    # Retry timing predictor
+    "RetryTimingPredictor",
+    "RetryTimingRecommendation",
+    "RecoveryAction",
+    "BASE_RETRY_DELAYS",
 ]

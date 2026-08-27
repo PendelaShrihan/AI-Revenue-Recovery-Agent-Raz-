@@ -43,11 +43,11 @@
 
 ### 🔹 Day 3 — ML Model & Failure Classification (Thursday, Aug 27, 2026)
 **Goal**: Train failure classifier and retry-timing predictor to optimize recovery success rates.
-- [ ] **Morning (Build)**: Build failure classification model — train on error codes, merchant category, amount, and time-of-day features.
-- [ ] **Morning (Build)**: Create feature engineering pipeline: encode categorical vars, normalize amounts, extract hour-of-day.
-- [ ] **Afternoon (Test)**: Train initial model on historical data; evaluate precision & recall per failure class (Target: >80% accuracy).
-- [ ] **Afternoon (Build)**: Build retry-timing predictor: given a failure type, output optimal retry delay in minutes.
-- [ ] **Afternoon (Review)**: Log model metrics and data quality findings to `tasks/lessons.md`.
+- [x] **Morning (Build)**: Build failure classification model — train on error codes, merchant category, amount, and time-of-day features.
+- [x] **Morning (Build)**: Create feature engineering pipeline: encode categorical vars, normalize amounts, extract hour-of-day.
+- [x] **Afternoon (Test)**: Train initial model on historical data; evaluate precision & recall per failure class (Target: >80% accuracy).
+- [x] **Afternoon (Build)**: Build retry-timing predictor: given a failure type, output optimal retry delay in minutes.
+- [x] **Afternoon (Review)**: Log model metrics and data quality findings to `tasks/lessons.md`.
 
 ---
 

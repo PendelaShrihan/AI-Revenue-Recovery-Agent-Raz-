@@ -159,6 +159,26 @@ class TestErrorCodeMapper(unittest.TestCase):
             with self.subTest(code=code, reason=reason):
                 self.assertEqual(classify_failure(code, reason), FailureCategory.UNKNOWN.value)
 
+    def test_classify_failure_graceful_none_and_edge_types(self):
+        """
+        Guarantee classify_failure() handles None, empty string, numeric,
+        and missing inputs gracefully without raising any exceptions.
+        """
+        # Both None
+        self.assertEqual(classify_failure(None, None), "unknown")
+        # No arguments passed
+        self.assertEqual(classify_failure(), "unknown")
+        # None as first arg with valid reason
+        self.assertEqual(classify_failure(None, "insufficient_funds"), "insufficient_funds")
+        # Valid code with None reason
+        self.assertEqual(classify_failure("GATEWAY_ERROR", None), "gateway_issue")
+        # Non-string types (integers, floats, dicts) handled gracefully
+        self.assertEqual(classify_failure(500, None), "unknown")
+        self.assertEqual(classify_failure(None, 404), "unknown")
+        self.assertEqual(classify_failure([], {}), "unknown")
+        # Whitespace-only strings
+        self.assertEqual(classify_failure("   ", "   "), "unknown")
+
     def test_transient_failure_check(self):
         """Verify is_transient_failure correctly distinguishes retryable vs non-retryable errors."""
         self.assertTrue(is_transient_failure("network_timeout"))

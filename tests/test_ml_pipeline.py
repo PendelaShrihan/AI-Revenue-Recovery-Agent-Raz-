@@ -249,29 +249,41 @@ class TestFeatureEngineeringPipeline:
 class TestParseDatetime:
     def test_datetime_passthrough(self):
         dt = datetime(2024, 5, 1, 12, 0)
-        assert _parse_datetime(dt) == dt
+        parsed = _parse_datetime(dt)
+        assert parsed.hour == 12
+        assert parsed.minute == 0
+        assert parsed.tzinfo is not None
+        assert "Asia/Kolkata" in str(parsed.tzinfo) or "+05:30" in str(parsed.tzinfo)
 
     def test_unix_timestamp(self):
         ts = 1_700_000_000
         result = _parse_datetime(ts)
         assert isinstance(result, datetime)
+        assert result.tzinfo is not None
 
     def test_iso_string(self):
         result = _parse_datetime("2024-06-15T14:30:00")
         assert result.hour == 14
         assert result.minute == 30
+        assert result.tzinfo is not None
 
     def test_iso_string_with_z(self):
         result = _parse_datetime("2024-06-15T14:30:00Z")
         assert isinstance(result, datetime)
+        # 14:30 UTC -> 20:00 IST (+5:30)
+        assert result.hour == 20
+        assert result.minute == 0
+        assert result.tzinfo is not None
 
     def test_none_returns_datetime(self):
         result = _parse_datetime(None)
         assert isinstance(result, datetime)
+        assert result.tzinfo is not None
 
     def test_invalid_string_returns_datetime(self):
         result = _parse_datetime("not-a-date")
         assert isinstance(result, datetime)
+        assert result.tzinfo is not None
 
 
 # ─── BalancedXGBClassifier Tests ──────────────────────────────────────────────

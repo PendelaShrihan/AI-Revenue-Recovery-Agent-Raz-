@@ -44,6 +44,14 @@ def _to_rupees(paise_amount: Optional[Any]) -> float:
         return 0.0
 
 
+def _sanitize_merchant_id(val: Optional[Any]) -> str:
+    """Sanitizes merchant_id with a guaranteed non-empty fallback string."""
+    if val is None:
+        return "unknown_merchant"
+    s = str(val).strip()
+    return s if s else "unknown_merchant"
+
+
 def normalize_webhook_payload(raw_payload: Dict[str, Any]) -> NormalizedEvent:
     """
     Normalizes raw Razorpay webhook JSON into a unified NormalizedEvent.
@@ -68,10 +76,9 @@ def normalize_webhook_payload(raw_payload: Dict[str, Any]) -> NormalizedEvent:
     if not isinstance(payload_container, dict):
         raise ValueError("Malformed Razorpay webhook payload: missing or invalid 'payload' object.")
 
-    merchant_id = (
+    merchant_id = _sanitize_merchant_id(
         raw_payload.get("account_id")
         or raw_payload.get("merchant_id")
-        or "unknown_merchant"
     )
     event_timestamp = _parse_timestamp(raw_payload.get("created_at"))
     synthetic_event_id = raw_payload.get("id") or f"evt_{uuid.uuid4().hex[:16]}"

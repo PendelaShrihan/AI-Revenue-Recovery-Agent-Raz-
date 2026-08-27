@@ -101,6 +101,38 @@ class TestDatabaseSchema(unittest.TestCase):
         self.assertEqual(len(fetched_tx.recovery_actions), 1)
         self.assertEqual(fetched_tx.to_dict()["retry_count"], 1)
 
+        # Test attempt_index property on RetryAttempt
+        fetched_retry = fetched_tx.retry_attempts[0]
+        self.assertEqual(fetched_retry.attempt_number, 1)
+        self.assertEqual(fetched_retry.attempt_index, 1)
+        self.assertEqual(fetched_retry.to_dict()["attempt_index"], 1)
+
+        # Verify duplicate razorpay_payment_id insert is rejected by DB UNIQUE constraint
+        from sqlalchemy.exc import IntegrityError
+        dup_tx = Transaction(
+            id="tx_test_dup_002",
+            razorpay_payment_id="pay_K12345678",  # duplicate payment_id
+            merchant_id="mer_ABC123",
+            amount=500.00,
+            currency="INR",
+            status="FAILED"
+        )
+        session.add(dup_tx)
+        with self.assertRaises(IntegrityError):
+            session.commit()
+        session.rollback()
+
+        # Verify composite UNIQUE constraint on (transaction_id, attempt_number)
+        dup_retry = RetryAttempt(
+            transaction_id="tx_test_001",
+            attempt_number=1,  # duplicate attempt_number for same tx
+            result="FAILED"
+        )
+        session.add(dup_retry)
+        with self.assertRaises(IntegrityError):
+            session.commit()
+        session.rollback()
+
         session.close()
         engine.dispose()
         if os.path.exists(db_file):

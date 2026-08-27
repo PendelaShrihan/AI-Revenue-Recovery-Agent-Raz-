@@ -20,8 +20,19 @@ Design principle:
 import math
 import hashlib
 import logging
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional
+
+# Explicitly enforce Asia/Kolkata (IST) timezone
+try:
+    from zoneinfo import ZoneInfo
+    IST_TZ = ZoneInfo("Asia/Kolkata")
+except Exception:
+    try:
+        import pytz
+        IST_TZ = pytz.timezone("Asia/Kolkata")
+    except Exception:
+        IST_TZ = timezone(timedelta(hours=5, minutes=30), name="Asia/Kolkata")
 
 import joblib
 import numpy as np
@@ -51,7 +62,7 @@ ALL_FEATURES: List[str] = CATEGORICAL_FEATURES + NUMERICAL_FEATURES + PASSTHROUG
 
 # ─── Helpers ───────────────────────────────────────────────────────────────────
 
-def _derive_merchant_category(merchant_id: str) -> str:
+def _derive_merchant_category(merchant_id: Any) -> str:
     """
     Assigns a deterministic volume tier to a merchant from its ID.
 
@@ -65,34 +76,48 @@ def _derive_merchant_category(merchant_id: str) -> str:
     Returns:
         One of: 'low_volume', 'medium_volume', 'high_volume'
     """
-    digest = hashlib.sha256(merchant_id.encode("utf-8")).hexdigest()
+    if merchant_id is None:
+        merchant_str = "unknown_merchant"
+    else:
+        s = str(merchant_id).strip()
+        merchant_str = s if s else "unknown_merchant"
+
+    digest = hashlib.sha256(merchant_str.encode("utf-8")).hexdigest()
     bucket = int(digest, 16) % 3
     return MERCHANT_CATEGORIES[bucket]
 
 
 def _parse_datetime(value: Any) -> datetime:
     """
-    Safely coerces various timestamp representations to datetime.
+    Safely coerces various timestamp representations to an Asia/Kolkata (IST) timezone-aware datetime.
 
     Handles:
-        - datetime objects (returned as-is)
-        - Unix integer / float timestamps
-        - ISO 8601 strings (with or without 'Z' suffix)
-        - None / unrecognized types (falls back to datetime.utcnow())
+        - datetime objects (localized / converted to Asia/Kolkata)
+        - Unix integer / float timestamps (converted from UTC to Asia/Kolkata)
+        - ISO 8601 strings (parsed and converted to Asia/Kolkata)
+        - None / unrecognized types (falls back to current datetime in Asia/Kolkata)
     """
     if isinstance(value, datetime):
-        return value
+        if value.tzinfo is None:
+            return value.replace(tzinfo=IST_TZ)
+        return value.astimezone(IST_TZ)
     if isinstance(value, (int, float)):
         try:
-            return datetime.utcfromtimestamp(value)
+            if value > 1e11:  # milliseconds
+                value = value / 1000.0
+            dt_utc = datetime.fromtimestamp(value, tz=timezone.utc)
+            return dt_utc.astimezone(IST_TZ)
         except (OSError, OverflowError, ValueError):
-            return datetime.utcnow()
+            return datetime.now(IST_TZ)
     if isinstance(value, str):
         try:
-            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                return parsed.replace(tzinfo=IST_TZ)
+            return parsed.astimezone(IST_TZ)
         except ValueError:
             pass
-    return datetime.utcnow()
+    return datetime.now(IST_TZ)
 
 
 # ─── Pipeline Class ────────────────────────────────────────────────────────────

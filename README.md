@@ -95,13 +95,53 @@ curl http://localhost:8000/health
 
 ---
 
+---
+
+## 🧠 Machine Learning & Algorithm Architecture
+
+The system utilizes a hybrid ML & deterministic decision pipeline comprising three core layers:
+
+```
+┌──────────────────────────┐    ┌─────────────────────────────────┐    ┌─────────────────────────────────┐
+│ 1. Feature Extraction    │ -> │ 2. Soft-Voting Classifier       │ -> │ 3. Smart Retry Optimizer        │
+│ Cyclical time, amount    │    │ Balanced XGBoost + Logistic Reg │    │ Backoff + IST Banking Windows   │
+│ log-scale, method & risk │    │ 8 Canonical Failure Classes     │    │ Max 2 Bounded Retries           │
+└──────────────────────────┘    └─────────────────────────────────┘    └─────────────────────────────────┘
+```
+
+### 1. Canonical Failure Classification (`ml/error_codes.py` & `ml/classifier.py`)
+- **8 Canonical Classes**: `insufficient_funds`, `card_blocked`, `network_timeout`, `gateway_issue`, `expired_card`, `authentication_failed`, `limit_exceeded`, `unknown`.
+- **Stateless Feature Engineering** (`FeatureEngineeringPipeline`):
+  - **Temporal**: $\sin(2\pi \cdot \text{hour}/24)$, $\cos(2\pi \cdot \text{hour}/24)$ (cyclical continuity across midnight), `is_weekend`.
+  - **Financial**: $\log_{1p}(\text{amount})$, bounded scaling via `StandardScaler`.
+  - **Categorical**: `payment_method`, `error_category`, `merchant_category` encoded via `OrdinalEncoder`.
+- **Soft-Voting Ensemble** (`VotingClassifier`):
+  - **BalancedXGBClassifier**: Gradient-boosted decision trees fitted with dynamic sample weights to balance rare classes.
+  - **LogisticRegression**: Inverse class-frequency weighting (`class_weight='balanced'`) for calibrated linear probabilities.
+  - Cross-validation results: Stratified 5-Fold CV achieving **>95% weighted F1-score**.
+
+### 2. Smart Retry-Timing Predictor (`ml/retry_predictor.py`)
+- **Adaptive Backoff Delays**:
+  - *Transient Network / Gateway Drops*: 5–15 mins (attempt 1), 30–60 mins (attempt 2).
+  - *Insufficient Funds*: 240–480 mins (4–8h) allowing account top-ups / salary credits.
+  - *Limit Exceeded*: 720–1440 mins (12–24h) aligned with daily 00:00 banking resets.
+  - *Terminal (Blocked / Expired Card)*: 0 delay, immediately routes to `ALTERNATE_METHOD`.
+  - *Authentication (OTP / MPIN)*: 15–60 mins cooloff, routes to `SEND_PAYMENT_LINK`.
+- **IST Banking Maintenance Window Avoidance**:
+  - Detects if calculated retries fall within NPCI / Core Banking switch maintenance windows (**01:00 AM – 04:00 AM IST**).
+  - Automatically shifts execution forward to the 06:00 AM IST business window to avoid guaranteed technical rejects.
+- **Bounded Stopping Rules**:
+  - Strictly enforces `max_retries = 2`. Any transaction reaching 2 failed attempts escalates directly to `MANUAL_REVIEW_REQUIRED`.
+
+---
+
 ## 📅 10-Day Sprint Roadmap
 
 For the complete daily checklist and progress tracking, see [`tasks/todo.md`](tasks/todo.md).
 
-- **Day 1**: Architecture & Environment Setup *(Current)*
-- **Day 2**: Data Pipeline & Razorpay Integration
-- **Day 3**: ML Model & Failure Classification
+- **Day 1**: Architecture & Environment Setup *(Completed)*
+- **Day 2**: Data Pipeline & Razorpay Integration *(Completed)*
+- **Day 3**: ML Model & Failure Classification *(Completed)*
 - **Day 4**: LLM Core Agent & Prompt Engineering
 - **Day 5**: API Layer & Merchant Dashboard
 - **Day 6**: Smart Retry Engine & Notification System
@@ -117,3 +157,4 @@ For the complete daily checklist and progress tracking, see [`tasks/todo.md`](ta
 - **Deterministic Isolation**: LLMs are strictly diagnostic classifiers and cannot trigger direct financial mutations or database updates without state machine validation.
 - **Hard Stopping Rule**: Programmatic cap of `max_retries = 2`.
 - **Audit Logging**: Zero state transitions occur without an explicit database transaction commit.
+

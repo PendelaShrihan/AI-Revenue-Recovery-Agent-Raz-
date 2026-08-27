@@ -214,10 +214,18 @@ def save_transaction(
             created_at=event.created_at or datetime.utcnow()
         )
 
-        s.add(new_tx)
-        s.flush()
-        logger.info(f"Saved new Transaction: id='{new_tx.id}', payment_id='{new_tx.razorpay_payment_id}', status='{new_tx.status}'")
-        return new_tx, True
+        try:
+            s.add(new_tx)
+            s.flush()
+            logger.info(f"Saved new Transaction: id='{new_tx.id}', payment_id='{new_tx.razorpay_payment_id}', status='{new_tx.status}'")
+            return new_tx, True
+        except IntegrityError:
+            s.rollback()
+            existing_tx = s.query(Transaction).filter_by(razorpay_payment_id=target_payment_id).first()
+            if existing_tx:
+                logger.info(f"Concurrent insert detected for payment_id='{target_payment_id}'. Deduplicated via UNIQUE constraint.")
+                return existing_tx, False
+            raise
 
 
 def save_recovery_action(

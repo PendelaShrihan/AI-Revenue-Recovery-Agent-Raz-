@@ -261,17 +261,19 @@ KEYWORD_PATTERNS = [
 ]
 
 
-def _normalize_string(val: Optional[str]) -> str:
-    """Helper to clean and normalize error string input."""
-    if not val:
+def _normalize_string(val: Optional[Any]) -> str:
+    """Helper to clean and normalize error string input safely."""
+    if val is None:
         return ""
-    # Strip whitespace and normalize delimiters to underscore
-    s = str(val).strip().lower()
-    s = re.sub(r"[\s\-]+", "_", s)
-    return s
+    try:
+        s = str(val).strip().lower()
+        s = re.sub(r"[\s\-]+", "_", s)
+        return s
+    except Exception:
+        return ""
 
 
-def classify_failure(error_code: Optional[str] = None, error_reason: Optional[str] = None) -> str:
+def classify_failure(error_code: Optional[Any] = None, error_reason: Optional[Any] = None) -> str:
     """
     Classifies a payment failure into one of 8 canonical categories:
     - insufficient_funds
@@ -282,6 +284,9 @@ def classify_failure(error_code: Optional[str] = None, error_reason: Optional[st
     - authentication_failed
     - limit_exceeded
     - unknown
+
+    Guarantees that None, empty string, or non-string inputs are handled gracefully
+    without raising exceptions, returning 'unknown'.
 
     Strategy:
     1. Check exact matches on `error_reason` (which is typically the most granular signal).
@@ -294,20 +299,23 @@ def classify_failure(error_code: Optional[str] = None, error_reason: Optional[st
         error_reason: Razorpay granular reason (e.g., 'insufficient_funds', 'card_declined', 'otp_timeout')
 
     Returns:
-        Canonical category string (e.g. 'insufficient_funds')
+        Canonical category string (e.g. 'insufficient_funds', 'unknown')
     """
+    if error_code is None and error_reason is None:
+        return FailureCategory.UNKNOWN.value
+
     norm_code = _normalize_string(error_code)
     norm_reason = _normalize_string(error_reason)
     upper_code = str(error_code or "").strip().upper()
 
     # Step 1: Check exact matches on error_reason
-    if norm_reason in ERROR_REASON_MAP:
+    if norm_reason and norm_reason in ERROR_REASON_MAP:
         return ERROR_REASON_MAP[norm_reason]
 
     # Step 2: Check exact matches on error_code (both upper and normalized)
-    if upper_code in ERROR_CODE_MAP:
+    if upper_code and upper_code in ERROR_CODE_MAP:
         return ERROR_CODE_MAP[upper_code]
-    if norm_code in ERROR_REASON_MAP:
+    if norm_code and norm_code in ERROR_REASON_MAP:
         return ERROR_REASON_MAP[norm_code]
 
     # Step 3: Combined text heuristic scan (reason prioritized over code)
@@ -317,12 +325,12 @@ def classify_failure(error_code: Optional[str] = None, error_reason: Optional[st
 
     for category, patterns in KEYWORD_PATTERNS:
         for pattern in patterns:
-            if re.search(pattern, norm_reason, re.IGNORECASE):
+            if norm_reason and re.search(pattern, norm_reason, re.IGNORECASE):
                 return category
 
     for category, patterns in KEYWORD_PATTERNS:
         for pattern in patterns:
-            if re.search(pattern, norm_code, re.IGNORECASE):
+            if norm_code and re.search(pattern, norm_code, re.IGNORECASE):
                 return category
 
     return FailureCategory.UNKNOWN.value

@@ -28,6 +28,7 @@ from api_integration.normalizer import (
     normalize_webhook_payload,
     _to_rupees,
     _parse_timestamp,
+    _sanitize_merchant_id,
 )
 
 
@@ -340,7 +341,7 @@ class TestWebhookNormalizer(unittest.TestCase):
             })
 
     def test_utility_functions(self):
-        """Verify helper math and timestamp parsing functions."""
+        """Verify helper math, timestamp parsing, and merchant_id sanitization functions."""
         self.assertEqual(_to_rupees(100), 1.0)
         self.assertEqual(_to_rupees(249900), 2499.0)
         self.assertEqual(_to_rupees(0), 0.0)
@@ -350,6 +351,13 @@ class TestWebhookNormalizer(unittest.TestCase):
         # Timestamps
         now_dt = _parse_timestamp(1756200000)
         self.assertEqual(now_dt.year, 2025)  # 1756200000 epoch is in 2025
+
+        # Merchant ID Sanitization
+        self.assertEqual(_sanitize_merchant_id(None), "unknown_merchant")
+        self.assertEqual(_sanitize_merchant_id(""), "unknown_merchant")
+        self.assertEqual(_sanitize_merchant_id("   "), "unknown_merchant")
+        self.assertEqual(_sanitize_merchant_id("acc_live_12345"), "acc_live_12345")
+        self.assertEqual(_sanitize_merchant_id(123456), "123456")
 
 
 class TestSignatureVerification(unittest.TestCase):
