@@ -1,0 +1,31 @@
+{
+  "trained_at": "2026-08-27T15:02:07.581160Z",
+  "n_training_records": 600,
+  "feature_shape": [
+    600,
+    7
+  ],
+  "model_architecture": "VotingClassifier(soft) [BalancedXGBClassifier + LogisticRegression]",
+  "cv_results": {
+    "cv_folds": 5,
+    "test_accuracy_mean": 1.0,
+    "test_accuracy_std": 0.0,
+    "test_f1_weighted_mean": 1.0,
+    "test_f1_macro_mean": 1.0,
+    "train_accuracy_mean": 1.0,
+    "per_fold_test_accuracy": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "per_fold_f1_weighted": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ]
+  }
+}
