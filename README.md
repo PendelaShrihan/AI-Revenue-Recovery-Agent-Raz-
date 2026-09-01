@@ -152,9 +152,49 @@ For the complete daily checklist and progress tracking, see [`tasks/todo.md`](ta
 
 ---
 
+## 🖥️ Merchant Dashboard & Real-Time SSE Feed
+
+The agent includes a real-time merchant dashboard served directly at `http://localhost:8000/dashboard/index.html`:
+
+- **Real-Time SSE Stream**: Subscribes to `GET /stream` for low-latency updates when new failure events are processed.
+- **Failover Polling**: Automatic 8-second polling fallback ensuring consistent UI sync.
+- **KPI Metrics**: Real-time counter cards showing Total Failures, Still Failed, Retry Scheduled, and Recovered Revenue %.
+- **Actionable Diagnostics**: Displays failure categories with color-coded severity, AI recommendations, retry attempt counts (`x/2`), and manual retry trigger buttons.
+- **Live AI Activity Feed**: Real-time ticker showing model decisions, action outcomes, and confidence percentages.
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│  AI Revenue Recovery · Merchant Dashboard                             │
+│  [Total: 42]   [Failed: 12]   [Retry Scheduled: 8]   [Recovered: 52%] │
+├─────────────────────────────────────────┬──────────────────────────────┤
+│ 📋 Failed Transactions                  │ 📡 AI Recovery Feed          │
+│ • pay_N9x...  ₹2,499  [Auth Failed]    │ • pay_N9x... auto_retry      │
+│ • pay_K2m...  ₹1,200  [Timeout] [Retry]│ • pay_K2m... 94% confidence  │
+└─────────────────────────────────────────┴──────────────────────────────┘
+```
+
+---
+
+## 🔌 Merchant REST API & Ingestion Endpoints
+
+All REST endpoints are protected with API Key authentication (`X-API-Key` or `Authorization: Bearer <key>`) and IP rate limiting (100 req/min via `slowapi`):
+
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/webhooks/razorpay` | POST | HMAC-SHA256 verified webhook listener for Razorpay gateway events. |
+| `/analyze-failure` | POST | Ingests raw failure details, executes ML ensemble + Gemini reasoning, dispatches action. |
+| `/recovery-suggestions` | GET | Queries recovery recommendations, failure histories, and retry eligibility. |
+| `/trigger-retry` | POST | Triggers manual/scheduled retry subject to the 2-attempt guardrail (`force=True` override). |
+| `/stats` | GET | Aggregate metrics and recovery success rates for reporting and dashboards. |
+| `/stream` | GET | Server-Sent Events stream for real-time dashboard listeners. |
+
+---
+
 ## 🛡️ Core Guardrails & Safety Architecture
 
 - **Deterministic Isolation**: LLMs are strictly diagnostic classifiers and cannot trigger direct financial mutations or database updates without state machine validation.
 - **Hard Stopping Rule**: Programmatic cap of `max_retries = 2`.
+- **Constant-Time Cryptography**: API key verification enforces `hmac.compare_digest` against timing-attack vectors.
 - **Audit Logging**: Zero state transitions occur without an explicit database transaction commit.
+
 

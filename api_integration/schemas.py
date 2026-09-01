@@ -95,3 +95,85 @@ class WebhookResponse(BaseModel):
     action_taken: str = Field(..., description="Action taken by the webhook listener")
     message: str = Field(..., description="Human-readable processing summary")
     normalized_event: Optional[NormalizedEvent] = Field(default=None, description="Normalized event payload summary")
+
+
+# ── REST API Request & Response Schemas ─────────────────────────────────────
+
+class FailureAnalysisRequest(BaseModel):
+    """Request model for POST /analyze-failure."""
+    payment_id: str = Field(..., description="Razorpay payment ID (e.g. 'pay_ABC123')")
+    amount: float = Field(..., description="Payment amount in standard units (e.g. 2499.00)")
+    currency: str = Field(default="INR", description="Currency code (e.g. 'INR')")
+    error_code: Optional[str] = Field(default=None, description="Gateway error code (e.g. 'BAD_REQUEST_ERROR')")
+    error_reason: Optional[str] = Field(default=None, description="Specific error reason (e.g. 'insufficient_funds')")
+    error_description: Optional[str] = Field(default=None, description="Detailed error description from gateway")
+    payment_method: str = Field(default="card", description="Payment method: card, upi, netbanking, etc.")
+    merchant_id: str = Field(default="acc_merchant_default", description="Merchant account ID")
+    customer_name: Optional[str] = Field(default=None, description="Customer full name")
+    customer_email: Optional[str] = Field(default=None, description="Customer contact email")
+    customer_phone: Optional[str] = Field(default=None, description="Customer contact phone")
+    notes: Dict[str, Any] = Field(default_factory=dict, description="Custom metadata notes")
+
+
+class FailureAnalysisResponse(BaseModel):
+    """Response model for POST /analyze-failure."""
+    status: str = Field(default="success", description="Status indicator")
+    transaction_id: str = Field(..., description="Internal transaction record ID")
+    payment_id: str = Field(..., description="Razorpay payment ID")
+    failure_category: str = Field(..., description="Diagnosed failure category (e.g. 'insufficient_funds')")
+    action_taken: str = Field(..., description="Action dispatched (e.g. 'auto_retry', 'send_payment_link')")
+    priority: str = Field(..., description="Recovery priority: low, medium, high, critical")
+    confidence: float = Field(..., description="Confidence score between 0.0 and 1.0")
+    retry_after: Optional[int] = Field(default=None, description="Delay in seconds before retry attempt")
+    alternate_method: Optional[str] = Field(default=None, description="Suggested alternate payment method")
+    customer_message: Optional[str] = Field(default=None, description="Customer-facing communication message")
+    reasoning: Optional[str] = Field(default=None, description="Diagnostic reasoning from Gemini agent")
+    db_record_id: Optional[int] = Field(default=None, description="ID of created action or retry database record")
+    elapsed_ms: Optional[float] = Field(default=None, description="Processing duration in milliseconds")
+
+
+class RecoverySuggestionItem(BaseModel):
+    """Individual recovery suggestion item in GET /recovery-suggestions."""
+    transaction_id: str
+    payment_id: str
+    merchant_id: str
+    amount: float
+    currency: str
+    status: str
+    failure_category: str
+    failure_reason: Optional[str] = None
+    failure_code: Optional[str] = None
+    suggested_action: str
+    retry_count: int = 0
+    max_retries: int = 2
+    can_retry: bool = True
+    latest_action: Optional[Dict[str, Any]] = None
+    created_at: Optional[str] = None
+
+
+class RecoverySuggestionsResponse(BaseModel):
+    """Response model for GET /recovery-suggestions."""
+    status: str = Field(default="success")
+    count: int = Field(..., description="Total suggestions returned")
+    suggestions: list[RecoverySuggestionItem] = Field(default_factory=list)
+
+
+class TriggerRetryRequest(BaseModel):
+    """Request model for POST /trigger-retry."""
+    payment_id: Optional[str] = Field(default=None, description="Razorpay payment ID")
+    transaction_id: Optional[str] = Field(default=None, description="Internal transaction ID")
+    delay_seconds: int = Field(default=0, description="Delay before retry in seconds (0 for immediate)")
+    force: bool = Field(default=False, description="Bypass max retry limit check if true")
+    reason: Optional[str] = Field(default=None, description="Optional trigger note or reason")
+
+
+class TriggerRetryResponse(BaseModel):
+    """Response model for POST /trigger-retry."""
+    status: str = Field(default="success")
+    transaction_id: str
+    payment_id: str
+    attempt_number: int
+    result: str
+    next_retry_at: Optional[str] = None
+    message: str
+

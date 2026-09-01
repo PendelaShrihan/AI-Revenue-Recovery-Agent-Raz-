@@ -1,6 +1,9 @@
 """
 Razorpay AI Revenue Recovery Agent - API Integration Module
 Contains Razorpay webhook ingestion, signature verification, payload normalization, and API simulators.
+
+Note: rest_router is NOT imported here to avoid circular imports (rest_router → agent.pipeline → agent.db_writer → api_integration.schemas).
+Import rest_router directly from api_integration.rest_router where needed.
 """
 
 from api_integration.schemas import (

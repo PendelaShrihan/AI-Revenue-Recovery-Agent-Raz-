@@ -1,6 +1,6 @@
 """
 Razorpay AI Revenue Recovery Agent - Agent Module
-Contains LLM diagnostic reasoning, database write layer, and recovery actions.
+Contains LLM diagnostic reasoning, database write layer, recovery actions, and pipeline.
 """
 
 from agent.models import (
@@ -36,6 +36,23 @@ from agent.recovery_engine import (
     get_recovery_decision,
 )
 
+from agent.action_engine import (
+    execute_auto_retry,
+    execute_alternate_suggestion,
+    execute_customer_notification,
+    dispatch_recovery_action,
+)
+
+from agent.pipeline import (
+    run_recovery_pipeline,
+)
+
+from agent.broadcaster import (
+    broadcast,
+    subscribe,
+    unsubscribe,
+)
+
 __version__ = "0.1.0"
 
 __all__ = [
@@ -64,4 +81,11 @@ __all__ = [
     # Recovery engine
     "RecoveryEngine",
     "get_recovery_decision",
+    # Action engine
+    "execute_auto_retry",
+    "execute_alternate_suggestion",
+    "execute_customer_notification",
+    "dispatch_recovery_action",
+    # Full pipeline
+    "run_recovery_pipeline",
 ]

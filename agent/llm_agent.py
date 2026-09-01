@@ -365,7 +365,7 @@ class GeminiAgent:
     _MAX_RETRIES = 5
     _INITIAL_BACKOFF = 3  # seconds
 
-    def __init__(self, model_name: str = "gemini-3.5-flash-lite") -> None:
+    def __init__(self, model_name: Optional[str] = None) -> None:
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
             raise GeminiAgentError(
@@ -373,7 +373,7 @@ class GeminiAgent:
                 "Add it to your .env file or export it in your shell."
             )
         self._client = genai.Client(api_key=api_key)
-        self._model_name = model_name
+        self._model_name = model_name or os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
         self._config = genai_types.GenerateContentConfig(
             system_instruction=SYSTEM_PROMPT,
         )

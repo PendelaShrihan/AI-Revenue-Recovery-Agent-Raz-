@@ -9,6 +9,7 @@ failure category override, calls the ``GeminiAgent``, and returns a
 
 from __future__ import annotations
 
+import os
 import logging
 from typing import Optional
 
@@ -37,9 +38,10 @@ class RecoveryEngine:
         model_name: Gemini model name (default: ``gemini-3.5-flash-lite``).
     """
 
-    def __init__(self, model_name: str = "gemini-3.5-flash-lite") -> None:
-        self._agent = GeminiAgent(model_name=model_name)
-        _logger.debug("RecoveryEngine initialised (model=%s)", model_name)
+    def __init__(self, model_name: Optional[str] = None) -> None:
+        effective_model = model_name or os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
+        self._agent = GeminiAgent(model_name=effective_model)
+        _logger.debug("RecoveryEngine initialised (model=%s)", effective_model)
 
     # ------------------------------------------------------------------
     # Public API
@@ -113,7 +115,7 @@ class RecoveryEngine:
 def get_recovery_decision(
     event: NormalizedEvent,
     ml_failure_category: Optional[str] = None,
-    model_name: str = "gemini-3.5-flash-lite",
+    model_name: Optional[str] = None,
 ) -> RecoveryDecision:
     """One-shot convenience wrapper around ``RecoveryEngine.process``.
 
