@@ -119,22 +119,33 @@ def execute_customer_notification(
     transaction: Transaction,
     message: str,
     channel: str = "email",
+    merchant_name: Optional[str] = None,
+    payment_link: Optional[str] = None,
+    alternate_method: Optional[str] = None,
+    customer_name: Optional[str] = None,
 ) -> RecoveryAction:
-    """Draft and log a customer notification for a failed transaction.
+    """Draft and log a personalized customer notification for a failed transaction.
 
     Creates a RecoveryAction record with ``action_type = 'customer_notified'``
-    and stores ``message`` and ``channel`` in the JSON payload.  Updates the
+    and stores rich personalization data (merchant name, formatted amount, payment link,
+    alternate methods, and channel-specific copies) in the JSON payload. Updates the
     transaction status to ``customer_notified``.
 
     Args:
-        transaction: The parent Transaction ORM instance.
-        message:     Customer-facing notification message text.
-        channel:     Delivery channel — one of ``"email"``, ``"sms"``,
-                     ``"whatsapp"`` (default: ``"email"``).
+        transaction:      The parent Transaction ORM instance.
+        message:          Customer-facing notification message text.
+        channel:          Delivery channel — one of ``"email"``, ``"sms"``,
+                          ``"whatsapp"`` (default: ``"email"``).
+        merchant_name:    Optional merchant/brand name.
+        payment_link:     Optional Razorpay payment link.
+        alternate_method: Optional alternate payment method suggestion.
+        customer_name:    Optional customer name.
 
     Returns:
         The newly created RecoveryAction instance.
     """
+    from agent.notification_engine import generate_personalized_notification
+
     VALID_CHANNELS = {"email", "sms", "whatsapp"}
     if channel not in VALID_CHANNELS:
         _logger.warning(
@@ -149,19 +160,25 @@ def execute_customer_notification(
         len(message),
     )
 
-    payload: Dict[str, Any] = {
-        "message": message,
-        "channel": channel,
-        "recipient_email": None,   # Populated by notification sender from customer profile
-        "transaction_amount": transaction.amount,
-        "currency": transaction.currency,
-        "notified_at": datetime.now(timezone.utc).isoformat(),
-    }
+    # Generate complete multi-channel personalized package
+    notif_data = generate_personalized_notification(
+        transaction=transaction,
+        failure_category=transaction.failure_code or "unknown",
+        channel=channel,
+        merchant_name=merchant_name,
+        payment_link=payment_link,
+        alternate_method=alternate_method,
+        customer_name=customer_name,
+        use_llm=False,  # Keep action engine synchronous and deterministic
+    )
+    # Ensure raw message passed from caller is preserved in primary payload
+    notif_data["message"] = message
+    notif_data["channel"] = channel
 
     action = save_recovery_action(
         transaction_id=transaction.id,
         action_type="customer_notified",
-        action_payload=payload,
+        action_payload=notif_data,
         status="EXECUTED",
     )
 

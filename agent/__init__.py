@@ -52,6 +52,15 @@ from agent.retry_executor import (
     execute_retry,
 )
 
+from agent.notification_engine import (
+    draft_whatsapp_message,
+    draft_sms_message,
+    draft_email_message,
+    generate_personalized_notification,
+    dispatch_customer_notification,
+    FAILURE_GUIDANCE,
+)
+
 from agent.pipeline import (
     run_recovery_pipeline,
     run_pending_retries,
@@ -100,6 +109,13 @@ __all__ = [
     "schedule_retry",
     "get_retry_status",
     "execute_retry",
+    # Notification & Communication Engine
+    "draft_whatsapp_message",
+    "draft_sms_message",
+    "draft_email_message",
+    "generate_personalized_notification",
+    "dispatch_customer_notification",
+    "FAILURE_GUIDANCE",
     # Full pipeline
     "run_recovery_pipeline",
     "run_pending_retries",

@@ -131,7 +131,42 @@ The system utilizes a hybrid ML & deterministic decision pipeline comprising thr
   - Detects if calculated retries fall within NPCI / Core Banking switch maintenance windows (**01:00 AM – 04:00 AM IST**).
   - Automatically shifts execution forward to the 06:00 AM IST business window to avoid guaranteed technical rejects.
 - **Bounded Stopping Rules**:
-  - Strictly enforces `max_retries = 2`. Any transaction reaching 2 failed attempts escalates directly to `MANUAL_REVIEW_REQUIRED`.
+  - Strictly enforces `max_retries = 3` with exponential backoff (1x, 2x, 4x delay). Any transaction exhausting automated attempts escalates directly to customer notification and manual review.
+
+---
+
+## 💬 Communication Engine & Notification System
+
+The autonomous recovery agent features a multi-channel **Communication Engine** (`agent/notification_engine.py`) designed to rescue high-intent transactions through empathetic, friction-reducing messaging:
+
+```
+┌─────────────────────────────────┐
+│ Failure Diagnosis & Context     │
+│ (Category, Amount, Method, Link)│
+└────────────────┬────────────────┘
+                 │
+                 ▼
+┌────────────────────────────────────────────────────────┐
+│ Personalized Multi-Channel Dispatcher                  │
+├─────────────────┬────────────────────┬─────────────────┤
+│ 🟢 WhatsApp     │ 📱 SMS             │ ✉️ Email        │
+│ Rich formatting,│ DLT compliant      │ Branded layout, │
+│ Emojis, Direct  │ (<160 chars),      │ Subject line,   │
+│ Payment Link CTA│ Short URL CTA      │ Detailed advice │
+└─────────────────┴────────────────────┴─────────────────┘
+```
+
+### 1. Dynamic Personalization Vectors
+- **Merchant Branding**: Injects authentic merchant business name and brand identity.
+- **Accurate Financials**: Formats exact transaction values (e.g. `₹2,499.00`).
+- **Dynamic Razorpay Payment Links**: Generates one-click retry checkout URLs (`https://rzp.io/i/...`).
+- **Contextual Alternate Payment Methods**: Suggests high-converting alternative instruments (e.g. 1-click UPI for OTP drop-offs, Netbanking for card declines).
+
+### 2. Failure-Specific Copywriting Strategies
+- **`insufficient_funds`**: Empathetic message highlighting UPI/alternate account options.
+- **`card_blocked` / `expired_card`**: Actionable guidance advising card updates while offering alternative payment methods.
+- **`authentication_failed` (OTP Freeze)**: Nudges customer to skip 2FA friction via instant UPI.
+- **`network_timeout` / `gateway_issue`**: Assures customer that automated retries are in progress while providing an instant payment link.
 
 ---
 
