@@ -39,53 +39,18 @@ def execute_auto_retry(
 ) -> RetryAttempt:
     """Schedule an automatic retry for a failed transaction.
 
-    Writes a RetryAttempt record to the database, sets ``next_retry_at`` to
-    ``now + retry_after_seconds``, and updates the transaction status to
-    ``retry_scheduled``.
+    Delegates to ``agent.retry_scheduler.schedule_retry`` to apply exponential
+    backoff and enforce the maximum 3 retries limit with notification fallback.
 
     Args:
         transaction:         The parent Transaction ORM instance.
-        retry_after_seconds: Number of seconds from now to schedule the retry.
+        retry_after_seconds: Base delay in seconds from Gemini.
 
     Returns:
-        The newly created RetryAttempt instance.
+        The newly created RetryAttempt instance (or existing/last attempt).
     """
-    now = datetime.now(timezone.utc)
-    next_retry_at = now + timedelta(seconds=retry_after_seconds)
-
-    _logger.info(
-        "[ActionEngine] execute_auto_retry | tx='%s' | retry_after=%ds | next_retry_at=%s",
-        transaction.id,
-        retry_after_seconds,
-        next_retry_at.isoformat(),
-    )
-
-    # Determine the next sequential attempt number via DB query to avoid DetachedInstanceError
-    with get_db_session() as s:
-        existing_count = s.query(RetryAttempt).filter_by(transaction_id=transaction.id).count()
-    attempt_number = existing_count + 1
-
-    # Write RetryAttempt record
-    retry = save_retry_attempt(
-        transaction_id=transaction.id,
-        attempt_number=attempt_number,
-        result="SCHEDULED",
-        next_retry_at=next_retry_at,
-    )
-
-    # Update transaction status
-    update_transaction_status(
-        razorpay_payment_id=transaction.id,
-        new_status="retry_scheduled",
-    )
-
-    _logger.info(
-        "[ActionEngine] RetryAttempt created | id=%d | tx='%s' | attempt=%d | next_retry=%s",
-        retry.id,
-        transaction.id,
-        attempt_number,
-        next_retry_at.isoformat(),
-    )
+    from agent.retry_scheduler import schedule_retry
+    retry = schedule_retry(transaction, retry_after_seconds=retry_after_seconds)
     return retry
 
 

@@ -69,7 +69,7 @@ def get_db_engine(database_url: Optional[str] = None):
     Strictly connects to the database configured in DATABASE_URL or passed as argument.
     Raises explicit SQLAlchemyError if the database connection fails.
     """
-    global _engine
+    global _engine, _SessionFactory
     if _engine is not None and database_url is None:
         return _engine
 
@@ -86,8 +86,8 @@ def get_db_engine(database_url: Optional[str] = None):
             f"Original error: {exc}"
         ) from exc
 
-    if database_url is None:
-        _engine = engine
+    _engine = engine
+    _SessionFactory = None  # Reset session factory to bind to new engine
     return engine
 
 
@@ -105,7 +105,10 @@ def get_session_factory(engine=None):
 
 
 def init_db(database_url: Optional[str] = None):
-    """Initializes tables in database."""
+    """Initializes tables in database and binds singleton engine/session."""
+    global _engine, _SessionFactory
+    _engine = None
+    _SessionFactory = None
     engine = get_db_engine(database_url)
     Base.metadata.create_all(engine)
     logger.info(f"Database schema initialized against {engine.url}")

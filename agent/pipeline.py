@@ -270,9 +270,84 @@ def run_recovery_pipeline(
 
 
 # ---------------------------------------------------------------------------
+# Pending Retries Runner
+# ---------------------------------------------------------------------------
+
+def run_pending_retries() -> Dict[str, int]:
+    """Query and process all due scheduled retries from the database.
+
+    Rules:
+    - Queries all RetryAttempt records where result="SCHEDULED" and next_retry_at <= now
+    - Calls retry_executor.execute_retry() for each one
+    - Returns summary: {"processed": 5, "recovered": 3, "failed": 2}
+
+    Returns:
+        Dict with keys: "processed", "recovered", "failed"
+    """
+    from agent.db_writer import get_db_session
+    from agent.models import RetryAttempt
+    from agent.retry_executor import execute_retry
+
+    now = datetime.now(timezone.utc)
+    # Also support naive UTC comparison if DB stores naive timestamps
+    now_naive = datetime.utcnow()
+
+    _logger.info("[Pipeline] Checking for pending retries due at or before %s", now.isoformat())
+
+    with get_db_session() as session:
+        # Retrieve all pending scheduled attempts
+        due_attempts = (
+            session.query(RetryAttempt)
+            .filter(
+                RetryAttempt.result == "SCHEDULED",
+                (RetryAttempt.next_retry_at <= now) | (RetryAttempt.next_retry_at <= now_naive),
+            )
+            .order_by(RetryAttempt.next_retry_at.asc())
+            .all()
+        )
+        attempt_ids = [att.id for att in due_attempts]
+
+    processed = 0
+    recovered = 0
+    failed = 0
+
+    for att_id in attempt_ids:
+        with get_db_session() as session:
+            att = session.query(RetryAttempt).filter_by(id=att_id).first()
+            if not att or att.result != "SCHEDULED":
+                continue
+
+        processed += 1
+        try:
+            res = execute_retry(att)
+            if res.get("status") == "recovered":
+                recovered += 1
+            else:
+                failed += 1
+        except Exception as exc:
+            _logger.error("[Pipeline] Error executing retry for attempt_id=%d: %s", att_id, exc, exc_info=True)
+            failed += 1
+
+    summary = {
+        "processed": processed,
+        "recovered": recovered,
+        "failed": failed,
+    }
+
+    _logger.info(
+        "[Pipeline] Pending retries execution completed: processed=%d, recovered=%d, failed=%d",
+        processed,
+        recovered,
+        failed,
+    )
+    return summary
+
+
+# ---------------------------------------------------------------------------
 # Public exports
 # ---------------------------------------------------------------------------
 
 __all__ = [
     "run_recovery_pipeline",
+    "run_pending_retries",
 ]

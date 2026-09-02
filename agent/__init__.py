@@ -43,8 +43,18 @@ from agent.action_engine import (
     dispatch_recovery_action,
 )
 
+from agent.retry_scheduler import (
+    schedule_retry,
+    get_retry_status,
+)
+
+from agent.retry_executor import (
+    execute_retry,
+)
+
 from agent.pipeline import (
     run_recovery_pipeline,
+    run_pending_retries,
 )
 
 from agent.broadcaster import (
@@ -86,6 +96,11 @@ __all__ = [
     "execute_alternate_suggestion",
     "execute_customer_notification",
     "dispatch_recovery_action",
+    # Retry Scheduler & Executor
+    "schedule_retry",
+    "get_retry_status",
+    "execute_retry",
     # Full pipeline
     "run_recovery_pipeline",
+    "run_pending_retries",
 ]
