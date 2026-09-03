@@ -1,11 +1,11 @@
-# ⚡ Razorpay AI Revenue Recovery Agent
+# Razorpay AI Revenue Recovery Agent
 
 > **Autonomous closed-loop diagnostic and revenue recovery engine for failed digital payments, checkout abandonments, and B2B overdue receivables.**  
 > Built for the **Razorpay Hackathon (Track 03 · AI Revenue Recovery Agent)**.
 
 ---
 
-## 🎯 Overview
+## Overview
 
 Digital commerce suffers from an ongoing "leaky bucket": payment gateway glitches, subscription mandate drops, and checkout friction lead to lost revenue. Traditional naive retries and generic email chasers are blind to context and fail to convert.
 
@@ -18,7 +18,7 @@ The **AI Revenue Recovery Agent** bridges this gap:
 
 ---
 
-## 📂 Repository Structure
+## Repository Structure
 
 ```
 .
@@ -44,18 +44,18 @@ The **AI Revenue Recovery Agent** bridges this gap:
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 - **Backend**: Python 3.10+ (FastAPI async architecture)
-- **Database**: SQLite (with WAL mode enabled) / PostgreSQL
-- **AI / LLM**: Claude 3.5 Sonnet / OpenAI GPT-4 / Google Gemini / Local Ollama (with mock fallback)
+- **Database**: PostgreSQL
+- **AI / LLM**: Google Gemini
 - **Machine Learning**: Scikit-Learn, XGBoost, Pandas, NumPy
 - **Containerization**: Docker & Docker Compose
 - **Testing**: Pytest, Pytest-asyncio, HTTPX
 
 ---
 
-## 🚀 Quickstart & Development Setup
+## Quickstart & Development Setup
 
 ### 1. Local Python Setup
 
@@ -97,7 +97,7 @@ curl http://localhost:8000/health
 
 ---
 
-## 🧠 Machine Learning & Algorithm Architecture
+## Machine Learning & Algorithm Architecture
 
 The system utilizes a hybrid ML & deterministic decision pipeline comprising three core layers:
 
@@ -135,7 +135,7 @@ The system utilizes a hybrid ML & deterministic decision pipeline comprising thr
 
 ---
 
-## 💬 Communication Engine & Notification System
+## Communication Engine & Notification System
 
 The autonomous recovery agent features a multi-channel **Communication Engine** (`agent/notification_engine.py`) designed to rescue high-intent transactions through empathetic, friction-reducing messaging:
 
@@ -170,7 +170,7 @@ The autonomous recovery agent features a multi-channel **Communication Engine** 
 
 ---
 
-## 📅 10-Day Sprint Roadmap
+## 10-Day Sprint Roadmap
 
 For the complete daily checklist and progress tracking, see [`tasks/todo.md`](tasks/todo.md).
 
@@ -187,7 +187,7 @@ For the complete daily checklist and progress tracking, see [`tasks/todo.md`](ta
 
 ---
 
-## 🖥️ Merchant Dashboard & Real-Time SSE Feed
+## Merchant Dashboard & Real-Time SSE Feed
 
 The agent includes a real-time merchant dashboard served directly at `http://localhost:8000/dashboard/index.html`:
 
@@ -202,7 +202,7 @@ The agent includes a real-time merchant dashboard served directly at `http://loc
 │  AI Revenue Recovery · Merchant Dashboard                             │
 │  [Total: 42]   [Failed: 12]   [Retry Scheduled: 8]   [Recovered: 52%] │
 ├─────────────────────────────────────────┬──────────────────────────────┤
-│ 📋 Failed Transactions                  │ 📡 AI Recovery Feed          │
+│  Failed Transactions                    │  AI Recovery Feed          │
 │ • pay_N9x...  ₹2,499  [Auth Failed]    │ • pay_N9x... auto_retry      │
 │ • pay_K2m...  ₹1,200  [Timeout] [Retry]│ • pay_K2m... 94% confidence  │
 └─────────────────────────────────────────┴──────────────────────────────┘
@@ -210,7 +210,7 @@ The agent includes a real-time merchant dashboard served directly at `http://loc
 
 ---
 
-## 🔌 Merchant REST API & Ingestion Endpoints
+## Merchant REST API & Ingestion Endpoints
 
 All REST endpoints are protected with API Key authentication (`X-API-Key` or `Authorization: Bearer <key>`) and IP rate limiting (100 req/min via `slowapi`):
 
@@ -227,7 +227,7 @@ All REST endpoints are protected with API Key authentication (`X-API-Key` or `Au
 
 ---
 
-## 📈 Success Metrics — Target 40–60% Recovery
+##  Success Metrics — Target 40–60% Recovery
 
 The Autonomous Recovery Agent targets a **40%–60% overall recovery rate** across all failure categories. Benchmark evaluation and batch simulation confirm an achieved **57.1% – 60.0% recovery rate**:
 
@@ -249,7 +249,7 @@ The Autonomous Recovery Agent targets a **40%–60% overall recovery rate** acro
 
 ---
 
-## 💰 Cost & Resource Analysis
+## Cost & Resource Analysis
 
 The recovery agent leverages Google's ultra-lightweight, low-latency reasoning model (`gemini-flash-lite-latest`) to maintain enterprise-scale cost efficiency:
 
@@ -273,7 +273,7 @@ The recovery agent leverages Google's ultra-lightweight, low-latency reasoning m
 
 ---
 
-## 🛡️ Core Guardrails & Safety Architecture
+## Core Guardrails & Safety Architecture
 
 - **Deterministic Isolation**: LLMs are strictly diagnostic classifiers and cannot trigger direct financial mutations or database updates without state machine validation.
 - **Hard Stopping Rule**: Programmatic cap of `max_retries = 2`.
