@@ -132,7 +132,15 @@ than this JSON object.
 # ---------------------------------------------------------------------------
 
 class GeminiAgentError(RuntimeError):
-    """Raised when the Gemini API cannot be reached after all retries."""
+    """Raised when the Gemini API encounters a generic or unrecoverable error."""
+
+
+class GeminiTimeoutError(GeminiAgentError):
+    """Raised when the Gemini API times out (>10s) after retries."""
+
+
+class GeminiRateLimitError(GeminiAgentError):
+    """Raised when Gemini returns 429 rate limit or quota exceeded after retries."""
 
 
 class GeminiOutputParseError(ValueError):
@@ -317,31 +325,18 @@ Customer:
   - customer_name : {event.customer_name or "N/A"}
   - notification_channels: {notification_channels}
 
-=== CHAIN-OF-THOUGHT STEPS ===
-
-Step 1 – Summarise the failure:
-  Briefly describe what happened based on the context above.
-
-Step 2 – Identify the failure category:
-  Match the failure_category field to one of the eight categories in the system
-  prompt. If the category is unknown, infer the most likely one from the error
-  details.
-
-Step 3 – Choose the recovery action:
-  Select the appropriate action from the system prompt for the identified
-  category. Factor in:
-    - Whether a subscription is involved (higher urgency).
-    - The hour of day (relevant for retry scheduling).
-    - Available notification channels.
-    - The payment method (some methods cannot be switched trivially).
-
-Step 4 – Compose the customer message:
-  Write a friendly, concise customer-facing message (max 2 sentences) that:
-    - Explains the issue simply (no technical jargon).
-    - Tells the customer what action they need to take (if any).
-
-Step 5 – Output the JSON:
-  Output ONLY the JSON object described in the system prompt. No extra text.
+=== RECOVERY DECISION TASK ===
+Evaluate the failure context above against the failure categories in your system instructions.
+Output ONLY the JSON object with the exact fields:
+{{
+  "action": "<auto_retry | suggest_alternate_method | send_payment_link | notify_customer | manual_review | no_action>",
+  "priority": "<high | medium | low>",
+  "message": "<friendly customer message, max 2 sentences>",
+  "retry_after": <integer seconds, 0 if no retry>,
+  "alternate_method": "<upi | wallet | netbanking | card | none>",
+  "confidence": <float 0.0 to 1.0>,
+  "reasoning": "<concise 1-sentence explanation of decision>"
+}}
 """
     return prompt
 
@@ -354,16 +349,16 @@ class GeminiAgent:
     """Wrapper around the Google Gemini API for payment recovery decisions.
 
     - Reads the API key from the ``GEMINI_API_KEY`` environment variable.
-    - Uses the ``gemini-2.0-flash`` model by default.
-    - Retries up to 3 times with exponential back-off (2 s → 4 s → 8 s).
+    - Uses the ``gemini-3.6-flash`` / ``gemini-2.0-flash`` model by default.
+    - Retries up to 3 times with exponential back-off (2 s → 4 s → 8 s) for rate limits.
+    - Times out if API response exceeds 10s per call and retries up to 3 times before raising GeminiTimeoutError.
     - Logs every prompt at DEBUG, every response at DEBUG, every error at ERROR.
-    - Raises ``GeminiAgentError`` if all retries are exhausted.
-    - Raises ``GeminiOutputParseError`` if the response cannot be parsed into the
-      required JSON schema.
+    - Raises ``GeminiTimeoutError`` on timeouts, ``GeminiRateLimitError`` on 429s, or ``GeminiAgentError`` on unrecoverable errors.
+    - Raises ``GeminiOutputParseError`` if the response cannot be parsed into the required JSON schema.
     """
 
-    _MAX_RETRIES = 5
-    _INITIAL_BACKOFF = 3  # seconds
+    _MAX_RETRIES = 3
+    _TIMEOUT_SECONDS = 10.0
 
     def __init__(self, model_name: Optional[str] = None) -> None:
         api_key = os.getenv("GEMINI_API_KEY")
@@ -372,31 +367,41 @@ class GeminiAgent:
                 "GEMINI_API_KEY environment variable is not set. "
                 "Add it to your .env file or export it in your shell."
             )
-        self._client = genai.Client(api_key=api_key)
-        self._model_name = model_name or os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
+        self._client = genai.Client(api_key=api_key, http_options={"timeout": 10000})
+        self._model_name = model_name or os.getenv("GEMINI_MODEL", "gemini-flash-lite-latest")
         self._config = genai_types.GenerateContentConfig(
             system_instruction=SYSTEM_PROMPT,
+            response_mime_type="application/json",
+            temperature=0.1,
         )
-        _logger.debug("GeminiAgent initialised with model=%s", model_name)
+        _logger.debug("GeminiAgent initialised with model=%s", self._model_name)
 
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
 
     def _call_api(self, prompt: str) -> str:
-        """Call the Gemini API with retry + exponential back-off.
+        """Call the Gemini API with retry, 10s timeout, and exponential back-off.
 
         Returns the raw text from the model on success.
-        Raises ``GeminiAgentError`` after ``_MAX_RETRIES`` consecutive failures.
+        Raises:
+            GeminiTimeoutError: If all 3 attempts exceed 10s timeout.
+            GeminiRateLimitError: If rate limited (429) after all backoff retries (2s, 4s, 8s).
+            GeminiAgentError: If unrecoverable API error occurs after retries.
         """
-        backoff = self._INITIAL_BACKOFF
+        last_error: Optional[Exception] = None
+        is_rate_limit = False
+        is_timeout = False
+
+        backoff_delays = [2, 4, 8]
 
         for attempt in range(1, self._MAX_RETRIES + 1):
+            _logger.debug(
+                "[Gemini] Request attempt=%d/%d model=%s prompt_length=%d chars\nPROMPT:\n%s",
+                attempt, self._MAX_RETRIES, self._model_name, len(prompt), prompt,
+            )
+
             try:
-                _logger.debug(
-                    "[Gemini] Request attempt=%d model=%s prompt_length=%d chars\nPROMPT:\n%s",
-                    attempt, self._model_name, len(prompt), prompt,
-                )
                 response = self._client.models.generate_content(
                     model=self._model_name,
                     contents=prompt,
@@ -409,37 +414,56 @@ class GeminiAgent:
                 )
                 return raw_text
 
-            except Exception as exc:  # noqa: BLE001  (broad – Gemini SDK raises various types)
-                _logger.error(
-                    "[Gemini] API call failed attempt=%d/%d error=%s",
-                    attempt, self._MAX_RETRIES, exc,
-                )
-                if attempt >= self._MAX_RETRIES:
-                    raise GeminiAgentError(
-                        f"Gemini API failed after {self._MAX_RETRIES} attempts. "
-                        f"Last error: {exc}"
-                    ) from exc
-
-                sleep_time = backoff
-                err_str = str(exc)
-                if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "quota" in err_str.lower():
-                    sleep_time = max(backoff, 6)
-                    _logger.warning("[Gemini] Rate limit detected. Backing off for %ds …", sleep_time)
+            except Exception as exc:
+                last_error = exc
+                err_str = str(exc).lower()
+                if "timeout" in err_str or "timed out" in err_str:
+                    is_timeout = True
+                    _logger.error("[Gemini] API call timed out on attempt=%d/%d (>10s): %s", attempt, self._MAX_RETRIES, exc)
+                elif "429" in err_str or "resource_exhausted" in err_str or "quota" in err_str or "rate limit" in err_str:
+                    is_rate_limit = True
+                    _logger.error("[Gemini] API call rate limited (429) attempt=%d/%d: %s", attempt, self._MAX_RETRIES, exc)
                 else:
-                    _logger.debug("[Gemini] Retrying in %d seconds …", sleep_time)
+                    _logger.error("[Gemini] API call failed attempt=%d/%d error=%s", attempt, self._MAX_RETRIES, exc)
 
-                time.sleep(sleep_time)
-                backoff *= 2
+            if attempt >= self._MAX_RETRIES:
+                if is_timeout:
+                    raise GeminiTimeoutError(
+                        f"Gemini API timed out (>10s) after {self._MAX_RETRIES} attempts. Last error: {last_error}"
+                    ) from last_error
+                if is_rate_limit:
+                    raise GeminiRateLimitError(
+                        f"Gemini API rate limit (429) exceeded after {self._MAX_RETRIES} attempts. Last error: {last_error}"
+                    ) from last_error
+                raise GeminiAgentError(
+                    f"Gemini API failed after {self._MAX_RETRIES} attempts. Last error: {last_error}"
+                ) from last_error
 
-        # Unreachable, but satisfies type checkers
-        raise GeminiAgentError("Unexpected state in GeminiAgent._call_api")
+            # Exponential backoff delay (2s, 4s, 8s) or dynamic API retryDelay on 429
+            delay = backoff_delays[attempt - 1] if attempt - 1 < len(backoff_delays) else 8
+            if is_rate_limit:
+                import re
+                match = re.search(r"retry\s*in\s*([0-9.]+)\s*s", str(last_error), re.IGNORECASE)
+                if not match:
+                    match = re.search(r"['\"]retryDelay['\"]\s*:\s*['\"]([0-9]+)s['\"]", str(last_error))
+                if match:
+                    delay = max(int(float(match.group(1))) + 2, delay)
+                else:
+                    delay = max(delay, 6 * attempt)
+                _logger.warning("[Gemini] 429 Rate limit encountered. Backing off for %ds before attempt %d…", delay, attempt + 1)
+            else:
+                _logger.debug("[Gemini] Retrying in %d seconds before attempt %d…", delay, attempt + 1)
+
+            time.sleep(delay)
+
+        raise GeminiAgentError("Unexpected termination in GeminiAgent._call_api")
 
     @staticmethod
     def _parse_response(raw: str) -> RecoveryDecision:
         """Parse and validate Gemini's raw text response into a ``RecoveryDecision``.
 
         Strips Markdown fences if present before JSON parsing.
-        Raises ``GeminiOutputParseError`` on any parsing or validation failure.
+        Logs raw response at DEBUG and raises ``GeminiOutputParseError`` on any parsing or validation failure.
         """
         # Strip optional ```json … ``` fences that some model versions emit
         cleaned = raw
@@ -452,18 +476,24 @@ class GeminiAgent:
         try:
             data: Dict[str, Any] = json.loads(cleaned)
         except json.JSONDecodeError as exc:
+            _logger.debug("[Gemini] Malformed JSON response received from model: %r", raw)
             raise GeminiOutputParseError(
                 f"Gemini response is not valid JSON. "
                 f"Parse error: {exc}. Raw response: {raw!r}"
             ) from exc
 
         if not isinstance(data, dict):
+            _logger.debug("[Gemini] Malformed JSON structure (not a dict): %r", raw)
             raise GeminiOutputParseError(
                 f"Gemini response parsed to {type(data).__name__} instead of a dict. "
                 f"Raw: {raw!r}"
             )
 
-        return RecoveryDecision.from_dict(data, raw=raw)
+        try:
+            return RecoveryDecision.from_dict(data, raw=raw)
+        except GeminiOutputParseError:
+            _logger.debug("[Gemini] Malformed JSON schema in response: %r", raw)
+            raise
 
     # ------------------------------------------------------------------
     # Public API
@@ -479,6 +509,8 @@ class GeminiAgent:
             A ``RecoveryDecision`` with all fields validated.
 
         Raises:
+            GeminiTimeoutError: If the call times out >10s after retries.
+            GeminiRateLimitError: If rate limit 429 persists after retries.
             GeminiAgentError: If the API cannot be reached after retries.
             GeminiOutputParseError: If the response does not match the required schema.
         """
@@ -505,6 +537,8 @@ class GeminiAgent:
 __all__ = [
     "GeminiAgent",
     "GeminiAgentError",
+    "GeminiTimeoutError",
+    "GeminiRateLimitError",
     "GeminiOutputParseError",
     "RecoveryDecision",
     "SYSTEM_PROMPT",

@@ -29,3 +29,65 @@
   - *Defensive Error Code Classification*: `classify_failure()` gracefully swallows `None`, non-string, and empty inputs, falling back deterministically to `'unknown'` without crashing the feature extraction pipeline.
 
 
+## 📌 Day 7: Integration Testing, Error Handling & Observability
+
+### 🐛 P0 Bug: `gemini-3.6-flash` Model Deprecated / Quota Exhausted
+- **Root Cause**: The free-tier quota for `gemini-3.6-flash` was both day-rate limited (20 RPD) and returned `504 DEADLINE_EXCEEDED`, indicating the model was overloaded/retired on this API key.
+- **Fix**: Switched to `gemini-flash-lite-latest` (resolves to `gemini-3.5-flash-lite`). Response time dropped from 9–10s+ timeouts to **1.1–2.9s**. Updated `.env`, `agent/llm_agent.py`, `agent/pipeline.py`, and `agent/recovery_engine.py`.
+- **Lesson**: Always alias model names to `*-latest` versions and validate the model responds correctly before committing to `.env`. Free-tier models can be hard-rate-limited (20 RPD) or sunset without notice.
+
+### 🐛 P0 Bug: `ThreadPoolExecutor` Context Manager Blocks Despite Timeout
+- **Root Cause**: `with ThreadPoolExecutor() as executor: future.result(timeout=10)` — when `TimeoutError` fired, the `with` block called `executor.shutdown(wait=True)`, blocking the main thread until the HTTP request finished, negating the timeout entirely.
+- **Fix**: Removed the `ThreadPoolExecutor` wrapper. Set native transport-level timeout via `genai.Client(http_options={"timeout": 10000})`. SDK now raises `httpx.ConnectTimeout` / `504` on the calling thread, caught cleanly in the retry loop.
+- **Lesson**: Never use `ThreadPoolExecutor` as a timeout mechanism for blocking I/O. Use transport-level timeouts (`httpx timeout`, `requests timeout=N`) which operate at the socket layer.
+
+### 🐛 P0 Bug: f-string Literal Braces in `build_cot_prompt` Cause `ValueError`
+- **Root Cause**: A JSON schema example with literal `{` and `}` inside an `f"""..."""` string raised `ValueError: Invalid format specifier` at runtime.
+- **Fix**: Escaped all literal curly braces as `{{` / `}}` in the f-string template.
+- **Lesson**: All `{` / `}` characters inside Python f-strings that are not interpolation expressions must be doubled: `{{` → `{` and `}}` → `}`.
+
+### 🐛 P1 Bug: `retry_scheduled` Not in Test Assertion Allow-list
+- **Root Cause**: `test_integration_full.py` omitted `"retry_scheduled"` from the valid TX status set. Scenarios like `network_timeout` and `gateway_issue` correctly produce `retry_scheduled` but were incorrectly flagged as failures.
+- **Fix**: Added `"retry_scheduled"` to the assertion allow-list in `_run_single_scenario`.
+- **Lesson**: Enumerate ALL valid terminal states for each action type in assertion allow-lists. `auto_retry` → `retry_scheduled`; `suggest_alternate_method` → `alternate_suggested`; `send_payment_link` → `customer_notified`.
+
+### 🐛 P1 Bug: 429 Backoff Too Short for Free-Tier API (15 RPM limit)
+- **Root Cause**: Static backoff delays (`[2, 4, 8]` seconds) were shorter than the API's `retryDelay` hint (often 10–28s), causing retries to immediately hit 429 again.
+- **Fix**: Added regex parsing of the `retryDelay` value from the 429 response body. Used `delay = max(api_retry_delay + 2, static_delay)` to always respect the server's suggested wait time.
+- **Lesson**: Always honour `Retry-After` / `retryDelay` from rate-limit responses. Static exponential backoff is insufficient for free-tier APIs — parse and respect the server's suggested delay.
+
+### 🐛 P1 Bug: Verbose CoT Prompt Caused 504 Gateway Timeout
+- **Root Cause**: The 5-step chain-of-thought prompt (`Step 1 Summarise → Step 2 Identify → ...`) generated long completions that exceeded the 10s gateway timeout for `gemini-3.6-flash`.
+- **Fix**: Replaced verbose CoT with a concise direct task description + explicit JSON output schema. Response time dropped from ~10s to ~1.5s.
+- **Lesson**: For latency-sensitive recovery agents, use short direct prompts with explicit JSON schemas rather than multi-step CoT. CoT adds significant token overhead and latency.
+
+### ✅ Final Integration Test Matrix (11/11 passed)
+```
+ insufficient_funds      → suggest_alternate_method ✅
+ card_blocked            → suggest_alternate_method ✅
+ network_timeout         → auto_retry               ✅
+ gateway_issue           → auto_retry               ✅
+ expired_card            → send_payment_link        ✅
+ authentication_failed   → auto_retry               ✅
+ limit_exceeded          → suggest_alternate_method ✅
+ unknown                 → auto_retry               ✅
+ subscription.halted     → auto_retry               ✅
+ invoice.overdue         → auto_retry               ✅
+ insufficient_funds_upi  → suggest_alternate_method ✅
+ Results: 11 passed, 0 failed | Total time: 38.5s
+```
+
+### ✅ Performance Benchmark (`scripts/latency_test.py`)
+```
+ Payment 1: 2169ms ✅ | Payment 2: 1683ms ✅ | Payment 3: 1308ms ✅
+ Payment 4: 1281ms ✅ | Payment 5: 2880ms ✅
+ Average: 1864ms  ← well under 3000ms target
+```
+
+### ✅ Regression Suite
+- `pytest -q`: **196 passed, 58 subtests** in 98.68s — zero failures.
+
+### 🏗 Architecture Notes
+- **Observability** (`agent/observability.py`): Thread-safe in-memory `METRICS` dict; `record_pipeline_run()` / `record_retry_execution()` hooks; `GET /metrics` REST endpoint returns live counters.
+- **Pipeline Safety Net** (`agent/pipeline.py`): Top-level `try/except Exception` catches all unhandled errors, sets DB status to `"pipeline_error"`, records metrics, returns error summary dict — never crashes the server.
+- **Windows UTF-8**: `sys.stdout.reconfigure(encoding="utf-8")` must be called at script startup to prevent `charmap` codec errors when printing emoji (`✅`, `❌`, `🚀`, `₹`) on Windows.

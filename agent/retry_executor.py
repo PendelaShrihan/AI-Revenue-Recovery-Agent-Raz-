@@ -95,6 +95,7 @@ def execute_retry(retry_attempt: RetryAttempt) -> Dict[str, Any]:
     client = _get_razorpay_client()
     payment_recovered = False
     failure_reason = ""
+    is_transient_error = True
 
     try:
         # Call Real Razorpay API
@@ -113,18 +114,38 @@ def execute_retry(retry_attempt: RetryAttempt) -> Dict[str, Any]:
         else:
             failure_reason = payment_data.get("error_description") or f"Payment status is {current_status}"
 
-    except razorpay.errors.BadRequestError as err:
-        failure_reason = getattr(err, "message", str(err))
-        _logger.warning("[RetryExecutor] Razorpay BadRequestError on tx='%s': %s", payment_id, failure_reason)
-    except razorpay.errors.GatewayError as err:
-        failure_reason = getattr(err, "message", str(err))
-        _logger.warning("[RetryExecutor] Razorpay GatewayError on tx='%s': %s", payment_id, failure_reason)
-    except razorpay.errors.ServerError as err:
-        failure_reason = getattr(err, "message", str(err))
-        _logger.warning("[RetryExecutor] Razorpay ServerError on tx='%s': %s", payment_id, failure_reason)
-    except Exception as exc:
-        failure_reason = str(exc)
-        _logger.error("[RetryExecutor] Unexpected exception calling Razorpay API for tx='%s': %s", payment_id, exc, exc_info=True)
+    except (TimeoutError, Exception) as err:
+        import requests
+        err_msg = str(err)
+        err_type = type(err).__name__
+
+        if isinstance(err, (TimeoutError, requests.exceptions.Timeout)) or "timeout" in err_msg.lower():
+            # Razorpay API timeout → log and mark retry as FAILED, schedule next attempt (transient)
+            failure_reason = f"Razorpay API timeout: {err_msg}"
+            is_transient_error = True
+            _logger.warning("[RetryExecutor] Razorpay API timeout on tx='%s' (attempt #%d): %s", payment_id, retry_attempt.attempt_number, failure_reason)
+
+        elif isinstance(err, razorpay.errors.BadRequestError) or "400" in err_msg or "bad_request" in err_msg.lower():
+            # Razorpay 4xx error → log full error code and reason, do not retry
+            failure_reason = f"Razorpay 4xx client error: {getattr(err, 'message', err_msg)}"
+            is_transient_error = False
+            _logger.warning(
+                "[RetryExecutor] Razorpay 4xx non-retryable error on tx='%s' (type=%s): %s",
+                payment_id,
+                err_type,
+                failure_reason,
+            )
+
+        elif isinstance(err, (razorpay.errors.ServerError, razorpay.errors.GatewayError)) or "500" in err_msg or "502" in err_msg or "503" in err_msg or "504" in err_msg:
+            # Razorpay 5xx error → treat as transient, schedule retry
+            failure_reason = f"Razorpay 5xx gateway/server error: {getattr(err, 'message', err_msg)}"
+            is_transient_error = True
+            _logger.warning("[RetryExecutor] Razorpay 5xx transient error on tx='%s': %s", payment_id, failure_reason)
+
+        else:
+            failure_reason = f"Unexpected error ({err_type}): {err_msg}"
+            is_transient_error = False
+            _logger.error("[RetryExecutor] Unexpected exception calling Razorpay API for tx='%s': %s", payment_id, err, exc_info=True)
 
     # ── Outcome Handling ─────────────────────────────────────────────────────
 
@@ -145,11 +166,18 @@ def execute_retry(retry_attempt: RetryAttempt) -> Dict[str, Any]:
         # 3. Log clearly as specified
         _logger.info("Payment recovered! tx='%s' amount=₹%.2f", payment_id, amount)
 
-        return {
+        result_dict = {
             "status": "recovered",
             "payment_id": payment_id,
             "amount": amount,
         }
+        try:
+            from agent.observability import record_retry_execution
+            record_retry_execution(result_dict)
+        except Exception:
+            pass
+
+        return result_dict
 
     else:
         # 1. Update retry_attempt result to FAILED
@@ -164,21 +192,21 @@ def execute_retry(retry_attempt: RetryAttempt) -> Dict[str, Any]:
 
         next_retry_iso: Optional[str] = None
 
-        if attempts_count < MAX_RETRIES:
-            # Re-fetch tx instance to pass to schedule_retry
+        # Only schedule next retry if the failure is transient AND attempts remaining (< MAX_RETRIES)
+        if is_transient_error and attempts_count < MAX_RETRIES:
             with get_db_session() as session:
                 active_tx = session.query(Transaction).filter_by(id=tx_id).first()
-                # Schedule next retry using base backoff (e.g. 900s or 600s)
+                # Schedule next retry using base backoff (900s)
                 next_attempt = schedule_retry(active_tx, retry_after_seconds=900)
                 if next_attempt and next_attempt.next_retry_at:
                     next_retry_iso = next_attempt.next_retry_at.isoformat()
         else:
-            # No attempts remaining — notify customer
+            # Terminal error (4xx or exhausted retries) — notify customer immediately
             with get_db_session() as session:
                 active_tx = session.query(Transaction).filter_by(id=tx_id).first()
                 notification_message = (
-                    f"Your payment of {currency} {amount:.2f} could not be recovered automatically. "
-                    f"Please update your payment method."
+                    f"Your payment of {currency} {amount:.2f} could not be completed ({failure_reason}). "
+                    f"Please update your payment method or contact support."
                 )
                 execute_customer_notification(
                     transaction=active_tx,
@@ -191,13 +219,21 @@ def execute_retry(retry_attempt: RetryAttempt) -> Dict[str, Any]:
                 failure_reason=failure_reason,
             )
 
-        return {
+        result_dict = {
             "status": "failed",
             "reason": failure_reason,
             "next_retry_at": next_retry_iso,
         }
+        try:
+            from agent.observability import record_retry_execution
+            record_retry_execution(result_dict)
+        except Exception:
+            pass
+
+        return result_dict
 
 
 __all__ = [
     "execute_retry",
 ]
+

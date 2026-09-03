@@ -39,7 +39,7 @@ class RecoveryEngine:
     """
 
     def __init__(self, model_name: Optional[str] = None) -> None:
-        effective_model = model_name or os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
+        effective_model = model_name or os.getenv("GEMINI_MODEL", "gemini-flash-lite-latest")
         self._agent = GeminiAgent(model_name=effective_model)
         _logger.debug("RecoveryEngine initialised (model=%s)", effective_model)
 

@@ -415,3 +415,19 @@ async def event_stream(
             "X-Accel-Buffering": "no",   # Disable nginx buffering
         },
     )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Endpoint 6: GET /metrics
+# ─────────────────────────────────────────────────────────────────────────────
+
+@rest_router.get(
+    "/metrics",
+    summary="Observability & Pipeline Metrics",
+    description="Returns aggregate real-time metrics including total failures, recovered count, recovery rate %, and avg latency.",
+)
+async def get_observability_metrics():
+    """Returns in-memory snapshot of recovery pipeline metrics."""
+    from agent.observability import get_metrics
+    return get_metrics()
+

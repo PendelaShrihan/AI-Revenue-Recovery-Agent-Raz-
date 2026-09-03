@@ -81,7 +81,7 @@ def _get_recovery_engine() -> RecoveryEngine:
     """Lazily initialise the RecoveryEngine (Gemini client) singleton."""
     global _recovery_engine
     if _recovery_engine is None:
-        model_name = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
+        model_name = os.getenv("GEMINI_MODEL", "gemini-flash-lite-latest")
         _recovery_engine = RecoveryEngine(model_name=model_name)
         _logger.debug("[Pipeline] RecoveryEngine initialised with model=%s", model_name)
     return _recovery_engine
@@ -116,35 +116,21 @@ def run_recovery_pipeline(
         2. Classify failure category via ML model (with rule-based fallback).
         3. Get recovery decision from Gemini via ``RecoveryEngine``.
         4. Dispatch the decision to the correct action executor.
+        5. Record pipeline observability metrics.
 
     Args:
         normalized_event: A ``NormalizedEvent`` produced by the webhook normaliser.
         force_ml_category: Optional override for ML category (for testing).
 
     Returns:
-        Summary dict::
-
-            {
-                "transaction_id":    "tx_pay_xxx",
-                "failure_category":  "insufficient_funds",
-                "action_taken":      "suggest_alternate_method",
-                "retry_after":       120,          # seconds (None if no retry)
-                "alternate_method":  "upi",        # None if not applicable
-                "priority":          "high",
-                "message":           "<customer message>",
-                "reasoning":         "<Gemini one-line reasoning>",
-                "confidence":        0.92,
-                "status":            "recovery_initiated",
-                "db_record_id":      42,
-            }
-
-    Raises:
-        RuntimeError: If the DB cannot be reached.
-        GeminiAgentError: If Gemini API is unavailable after retries.
-        GeminiOutputParseError: If Gemini returns malformed JSON.
+        Summary dict on success, or error summary dict on pipeline failure.
     """
+    from agent.db_writer import update_transaction_status
+    from agent.observability import record_pipeline_run
+
     pipeline_start = datetime.now(timezone.utc)
     payment_id = normalized_event.payment_id or normalized_event.entity_id
+    transaction = None
 
     _logger.info(
         "[Pipeline] ════════════════════════════════════════════════════════"
@@ -156,117 +142,156 @@ def run_recovery_pipeline(
         normalized_event.currency,
     )
 
-    # ── Step 1: Persist transaction ──────────────────────────────────────────
-    _log_step(1, f"Saving transaction for payment_id='{payment_id}'")
-    transaction, is_new = save_transaction(normalized_event)
-    _log_step(
-        1,
-        "Transaction persisted",
-        f"tx_id='{transaction.id}' is_new={is_new}",
-    )
+    try:
+        # ── Step 1: Persist transaction ──────────────────────────────────────────
+        _log_step(1, f"Saving transaction for payment_id='{payment_id}'")
+        transaction, is_new = save_transaction(normalized_event)
+        _log_step(
+            1,
+            "Transaction persisted",
+            f"tx_id='{transaction.id}' is_new={is_new}",
+        )
 
-    # ── Step 2: ML failure classification ───────────────────────────────────
-    _log_step(2, "Running ML failure classification")
+        # ── Step 2: ML failure classification ───────────────────────────────────
+        _log_step(2, "Running ML failure classification")
 
-    failure_category: str
+        failure_category: str
 
-    if force_ml_category:
-        failure_category = force_ml_category
-        _log_step(2, "ML category (forced override)", failure_category)
-    else:
-        try:
-            classifier = _get_classifier()
-            if classifier is not None:
-                feat_pipeline = _get_feature_pipeline()
-                record = {
-                    "error_code": normalized_event.error_code,
-                    "error_reason": normalized_event.error_reason,
-                    "payment_method": normalized_event.payment_method,
-                    "merchant_id": normalized_event.merchant_id,
-                    "amount": normalized_event.amount,
-                    "created_at": normalized_event.created_at,
-                }
-                features_df = feat_pipeline.extract_features([record])
-                predictions = classifier.predict(features_df)
-                failure_category = str(predictions[0])
-                _log_step(2, "ML failure classification (ensemble model)", failure_category)
-            else:
-                # Rule-based fallback
+        if force_ml_category:
+            failure_category = force_ml_category
+            _log_step(2, "ML category (forced override)", failure_category)
+        else:
+            try:
+                classifier = _get_classifier()
+                if classifier is not None:
+                    feat_pipeline = _get_feature_pipeline()
+                    record = {
+                        "error_code": normalized_event.error_code,
+                        "error_reason": normalized_event.error_reason,
+                        "payment_method": normalized_event.payment_method,
+                        "merchant_id": normalized_event.merchant_id,
+                        "amount": normalized_event.amount,
+                        "created_at": normalized_event.created_at,
+                    }
+                    features_df = feat_pipeline.extract_features([record])
+                    predictions = classifier.predict(features_df)
+                    failure_category = str(predictions[0])
+                    _log_step(2, "ML failure classification (ensemble model)", failure_category)
+                else:
+                    # Rule-based fallback
+                    failure_category = classify_failure(
+                        error_code=normalized_event.error_code,
+                        error_reason=normalized_event.error_reason,
+                    )
+                    _log_step(2, "ML failure classification (rule-based fallback)", failure_category)
+            except Exception as exc:
+                _logger.warning(
+                    "[Pipeline] ML classification failed (%s). Falling back to rule-based.", exc
+                )
                 failure_category = classify_failure(
                     error_code=normalized_event.error_code,
                     error_reason=normalized_event.error_reason,
                 )
-                _log_step(2, "ML failure classification (rule-based fallback)", failure_category)
-        except Exception as exc:
-            _logger.warning(
-                "[Pipeline] ML classification failed (%s). Falling back to rule-based.", exc
-            )
-            failure_category = classify_failure(
-                error_code=normalized_event.error_code,
-                error_reason=normalized_event.error_reason,
-            )
-            _log_step(2, "ML failure classification (exception fallback)", failure_category)
+                _log_step(2, "ML failure classification (exception fallback)", failure_category)
 
-    # ── Step 3: Gemini recovery decision ────────────────────────────────────
-    _log_step(3, f"Requesting Gemini recovery decision for failure_category='{failure_category}'")
-    engine = _get_recovery_engine()
-    decision = engine.process(normalized_event, ml_failure_category=failure_category)
+        # ── Step 3: Gemini recovery decision ────────────────────────────────────
+        _log_step(3, f"Requesting Gemini recovery decision for failure_category='{failure_category}'")
+        engine = _get_recovery_engine()
+        decision = engine.process(normalized_event, ml_failure_category=failure_category)
 
-    decision_dict = {
-        "action": decision.action,
-        "priority": decision.priority,
-        "message": decision.message,
-        "retry_after": decision.retry_after,
-        "alternate_method": decision.alternate_method,
-        "confidence": decision.confidence,
-        "reasoning": decision.reasoning,
-    }
-    _log_step(
-        3,
-        "Gemini decision received",
-        f"action='{decision.action}' priority='{decision.priority}' confidence={decision.confidence:.2f}",
-    )
+        decision_dict = {
+            "action": decision.action,
+            "priority": decision.priority,
+            "message": decision.message,
+            "retry_after": decision.retry_after,
+            "alternate_method": decision.alternate_method,
+            "confidence": decision.confidence,
+            "reasoning": decision.reasoning,
+        }
+        _log_step(
+            3,
+            "Gemini decision received",
+            f"action='{decision.action}' priority='{decision.priority}' confidence={decision.confidence:.2f}",
+        )
 
-    # ── Step 4: Dispatch recovery action ────────────────────────────────────
-    _log_step(4, f"Dispatching action='{decision.action}' for tx='{transaction.id}'")
-    dispatch_result = dispatch_recovery_action(decision_dict, transaction)
-    _log_step(
-        4,
-        "Action dispatched",
-        f"db_record_id={dispatch_result.get('db_record_id')} status='{dispatch_result.get('status')}'",
-    )
+        # ── Step 4: Dispatch recovery action ────────────────────────────────────
+        _log_step(4, f"Dispatching action='{decision.action}' for tx='{transaction.id}'")
+        dispatch_result = dispatch_recovery_action(decision_dict, transaction)
+        _log_step(
+            4,
+            "Action dispatched",
+            f"db_record_id={dispatch_result.get('db_record_id')} status='{dispatch_result.get('status')}'",
+        )
 
-    # ── Build summary ────────────────────────────────────────────────────────
-    elapsed_ms = (datetime.now(timezone.utc) - pipeline_start).total_seconds() * 1000
+        # ── Build summary ────────────────────────────────────────────────────────
+        elapsed_ms = (datetime.now(timezone.utc) - pipeline_start).total_seconds() * 1000
 
-    summary: Dict[str, Any] = {
-        "transaction_id": transaction.id,
-        "payment_id": payment_id,
-        "failure_category": failure_category,
-        "action_taken": decision.action,
-        "retry_after": dispatch_result.get("retry_after"),
-        "alternate_method": dispatch_result.get("alternate_method"),
-        "priority": decision.priority,
-        "message": decision.message,
-        "reasoning": decision.reasoning,
-        "confidence": decision.confidence,
-        "db_record_id": dispatch_result.get("db_record_id"),
-        "status": "recovery_initiated",
-        "elapsed_ms": round(elapsed_ms, 1),
-    }
+        summary: Dict[str, Any] = {
+            "transaction_id": transaction.id,
+            "payment_id": payment_id,
+            "failure_category": failure_category,
+            "action_taken": decision.action,
+            "retry_after": dispatch_result.get("retry_after"),
+            "alternate_method": dispatch_result.get("alternate_method"),
+            "priority": decision.priority,
+            "message": decision.message,
+            "reasoning": decision.reasoning,
+            "confidence": decision.confidence,
+            "db_record_id": dispatch_result.get("db_record_id"),
+            "status": "recovery_initiated",
+            "elapsed_ms": round(elapsed_ms, 1),
+        }
 
-    _logger.info(
-        "[Pipeline] ✅ Pipeline completed in %.1fms | tx='%s' | action='%s' | category='%s'",
-        elapsed_ms,
-        transaction.id,
-        decision.action,
-        failure_category,
-    )
-    _logger.info(
-        "[Pipeline] ════════════════════════════════════════════════════════"
-    )
+        _logger.info(
+            "[Pipeline] ✅ Pipeline completed in %.1fms | tx='%s' | action='%s' | category='%s'",
+            elapsed_ms,
+            transaction.id,
+            decision.action,
+            failure_category,
+        )
+        _logger.info(
+            "[Pipeline] ════════════════════════════════════════════════════════"
+        )
 
-    return summary
+        record_pipeline_run(summary)
+        return summary
+
+    except Exception as exc:
+        elapsed_ms = (datetime.now(timezone.utc) - pipeline_start).total_seconds() * 1000
+        _logger.error(
+            "[Pipeline] ❌ Unhandled exception during recovery pipeline for payment_id='%s': %s",
+            payment_id,
+            exc,
+            exc_info=True,
+        )
+
+        # Attempt to update transaction status to pipeline_error in database
+        try:
+            target_pid = transaction.razorpay_payment_id if transaction else payment_id
+            if target_pid:
+                update_transaction_status(
+                    razorpay_payment_id=target_pid,
+                    new_status="pipeline_error",
+                    failure_reason=str(exc),
+                )
+        except Exception as db_err:
+            _logger.error("[Pipeline] Failed to update transaction status to pipeline_error: %s", db_err)
+
+        error_summary: Dict[str, Any] = {
+            "status": "pipeline_error",
+            "error": str(exc),
+            "transaction_id": transaction.id if transaction else None,
+            "payment_id": payment_id,
+            "elapsed_ms": round(elapsed_ms, 1),
+        }
+
+        try:
+            record_pipeline_run(error_summary)
+        except Exception:
+            pass
+
+        return error_summary
+
 
 
 # ---------------------------------------------------------------------------
