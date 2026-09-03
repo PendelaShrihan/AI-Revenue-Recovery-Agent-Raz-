@@ -239,6 +239,9 @@ def run_recovery_pipeline(
             "confidence": decision.confidence,
             "db_record_id": dispatch_result.get("db_record_id"),
             "status": "recovery_initiated",
+            "cost_usd": getattr(decision, "cost_usd", 0.0),
+            "input_tokens": getattr(decision, "input_tokens", 0),
+            "output_tokens": getattr(decision, "output_tokens", 0),
             "elapsed_ms": round(elapsed_ms, 1),
         }
 

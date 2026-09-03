@@ -94,11 +94,11 @@
 
 ### 🔹 Day 8 — Analytics, Metrics & Cost Optimization (Tuesday, Sep 1, 2026)
 **Goal**: Calculate total money recovered, track LLM token spend, and implement diagnostic caching.
-- [ ] **Morning (Build)**: Implement recovery analytics: track recovery rate, total revenue saved (₹), and failure distribution.
-- [ ] **Morning (Build)**: Build cost tracker: log LLM token usage per transaction; estimate monthly API cost.
-- [ ] **Afternoon (Build)**: Add caching layer for LLM responses: identical failure type + merchant category $\rightarrow$ reuse prior response.
-- [ ] **Afternoon (Review)**: Verify class definitions and done criteria per R&D milestones.
-- [ ] **Afternoon (Review)**: Feasibility analysis writeup: document actual vs. projected performance numbers.
+- [x] **Morning (Build)**: Implement recovery analytics: track recovery rate, total revenue saved (₹), and failure distribution.
+- [x] **Morning (Build)**: Build cost tracker: log LLM token usage per transaction; estimate monthly API cost.
+- [x] **Afternoon (Build)**: Add caching layer for LLM responses: identical failure type + merchant category $\rightarrow$ reuse prior response.
+- [x] **Afternoon (Review)**: Verify class definitions and done criteria per R&D milestones.
+- [x] **Afternoon (Review)**: Feasibility analysis writeup: document actual vs. projected performance numbers.
 
 ---
 

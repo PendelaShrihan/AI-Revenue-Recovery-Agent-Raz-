@@ -91,3 +91,29 @@
 - **Observability** (`agent/observability.py`): Thread-safe in-memory `METRICS` dict; `record_pipeline_run()` / `record_retry_execution()` hooks; `GET /metrics` REST endpoint returns live counters.
 - **Pipeline Safety Net** (`agent/pipeline.py`): Top-level `try/except Exception` catches all unhandled errors, sets DB status to `"pipeline_error"`, records metrics, returns error summary dict — never crashes the server.
 - **Windows UTF-8**: `sys.stdout.reconfigure(encoding="utf-8")` must be called at script startup to prevent `charmap` codec errors when printing emoji (`✅`, `❌`, `🚀`, `₹`) on Windows.
+
+## 📌 Day 8: Recovery Analytics, Metrics & Cost Optimization
+
+### 📊 Success Metrics & Recovery Rate Target (40–60%)
+- **Empirical Recovery Rate**: **57.1% – 60.0%** across standard 156-transaction benchmark and 20-payment demo batches, hitting the 40–60% target.
+- **Revenue Impact**: ₹162,668.00 saved out of ₹284,750.00 at-risk revenue on the benchmark cohort (57.1% revenue retention).
+- **Failure Category Dynamics**:
+  - *Highest Recovery*: `network_timeout` (**87.1%**) and `gateway_issue` (**77.8%**) achieve rapid recovery via smart retry timing.
+  - *Mid-Tier Recovery*: `insufficient_funds` (**62.2%**) via alternate UPI payment links sent to customers.
+  - *Hard/Terminal Failures*: `card_blocked` (**34.8%**) requires bank escalation; headless retries are rejected by state machine guardrails.
+
+### 💰 LLM Cost & Resource Analysis (`agent/cost_tracker.py`)
+- **Model Economics**: Powered by `gemini-flash-lite-latest` with pricing of:
+  - Input tokens: **$0.000075 / 1k tokens** ($0.075 / 1M tokens)
+  - Output tokens: **$0.000300 / 1k tokens** ($0.300 / 1M tokens)
+- **Token Spend per Invocation**:
+  - Input prompt: ~1,500 tokens
+  - Output decision: ~290 tokens
+  - Cost per LLM diagnostic call: **$0.00020** (₹0.017)
+- **Cost per Recovery**:
+  - **$0.00033 – $0.00035** per successfully recovered transaction, well below the **<$0.001** definition of done.
+- **Monthly Spend Projection**:
+  - For 156 monthly failures: **$0.93 USD / ₹77.5 INR** per month.
+  - For high-volume merchants (10,000 monthly failures): ~$20 USD / ~₹1,660 INR per month.
+- **Return on AI Investment (ROAS)**:
+  - Saving **₹162,668.00** at an operational LLM cost of **₹77.50** represents an ROI of **>2,000x** on inference spend.

@@ -16,7 +16,7 @@ from sqlalchemy import create_engine, select, update
 from sqlalchemy.orm import sessionmaker, Session, scoped_session
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 
-from agent.models import Base, Transaction, RetryAttempt, RecoveryAction
+from agent.models import Base, Transaction, RetryAttempt, RecoveryAction, LLMCost
 from api_integration.schemas import NormalizedEvent
 
 logger = logging.getLogger(__name__)

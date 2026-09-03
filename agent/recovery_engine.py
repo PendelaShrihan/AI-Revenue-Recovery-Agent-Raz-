@@ -96,7 +96,8 @@ class RecoveryEngine:
             object.__setattr__(prompt_event, "_ml_failure_category", ml_failure_category)
 
         prompt = build_cot_prompt(prompt_event, ml_failure_category=ml_failure_category)
-        decision = self._agent.generate(prompt)
+        tx_id = event.payment_id or event.entity_id
+        decision = self._agent.generate(prompt, transaction_id=tx_id)
 
         _logger.debug(
             "[RecoveryEngine] Decision for event_id=%s: action=%s priority=%s confidence=%.2f",

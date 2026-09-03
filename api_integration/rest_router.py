@@ -431,3 +431,33 @@ async def get_observability_metrics():
     from agent.observability import get_metrics
     return get_metrics()
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Endpoint 7: GET /analytics
+# ─────────────────────────────────────────────────────────────────────────────
+
+@rest_router.get(
+    "/analytics",
+    summary="Recovery Analytics & Performance Metrics",
+    description="Returns full recovery analytics including recovery rate, revenue saved, failure distribution by category, and daily trend.",
+)
+async def get_analytics_endpoint():
+    """Returns comprehensive revenue recovery analytics from the database."""
+    from agent.analytics import get_recovery_analytics
+    return get_recovery_analytics()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Endpoint 8: GET /costs
+# ─────────────────────────────────────────────────────────────────────────────
+
+@rest_router.get(
+    "/costs",
+    summary="LLM Cost Tracker & Token Economics",
+    description="Returns aggregate LLM token usage, cost per recovery, latency, and estimated monthly cost in USD and INR.",
+)
+async def get_costs_endpoint():
+    """Returns aggregate LLM cost and token summary from the database."""
+    from agent.cost_tracker import get_cost_summary
+    return get_cost_summary()
+

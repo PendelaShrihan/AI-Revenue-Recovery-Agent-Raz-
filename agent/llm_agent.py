@@ -178,6 +178,11 @@ class RecoveryDecision:
 
     # The raw text returned by Gemini (for audit / debugging)
     raw_response: str = ""
+    input_tokens: int = 0
+    output_tokens: int = 0
+    latency_ms: float = 0.0
+    cost_usd: float = 0.0
+    model: str = ""
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any], raw: str = "") -> "RecoveryDecision":
@@ -374,13 +379,14 @@ class GeminiAgent:
             response_mime_type="application/json",
             temperature=0.1,
         )
+        self._last_call_meta: Dict[str, Any] = {}
         _logger.debug("GeminiAgent initialised with model=%s", self._model_name)
 
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _call_api(self, prompt: str) -> str:
+    def _call_api(self, prompt: str, transaction_id: Optional[str] = None) -> str:
         """Call the Gemini API with retry, 10s timeout, and exponential back-off.
 
         Returns the raw text from the model on success.
@@ -402,15 +408,52 @@ class GeminiAgent:
             )
 
             try:
+                start_time = time.perf_counter()
                 response = self._client.models.generate_content(
                     model=self._model_name,
                     contents=prompt,
                     config=self._config,
                 )
+                latency_ms = (time.perf_counter() - start_time) * 1000.0
                 raw_text = response.text.strip()
+
+                # Extract token usage and record cost
+                input_tokens = 0
+                output_tokens = 0
+                if hasattr(response, "usage_metadata") and response.usage_metadata:
+                    input_tokens = getattr(response.usage_metadata, "prompt_token_count", 0) or 0
+                    output_tokens = getattr(response.usage_metadata, "candidates_token_count", 0) or 0
+
+                if input_tokens == 0:
+                    input_tokens = max(1, len(prompt) // 4)
+                if output_tokens == 0:
+                    output_tokens = max(1, len(raw_text) // 4)
+
+                try:
+                    from agent.cost_tracker import log_llm_call
+                    cost_info = log_llm_call(
+                        transaction_id=transaction_id,
+                        input_tokens=input_tokens,
+                        output_tokens=output_tokens,
+                        model=self._model_name,
+                        latency_ms=latency_ms,
+                    )
+                    cost_usd = cost_info.get("cost_usd", 0.0)
+                except Exception as log_err:
+                    _logger.warning("[Gemini] Failed to log LLM call cost: %s", log_err)
+                    cost_usd = 0.0
+
+                self._last_call_meta = {
+                    "input_tokens": input_tokens,
+                    "output_tokens": output_tokens,
+                    "latency_ms": latency_ms,
+                    "cost_usd": cost_usd,
+                    "model": self._model_name,
+                }
+
                 _logger.debug(
-                    "[Gemini] Response attempt=%d response_length=%d chars\nRESPONSE:\n%s",
-                    attempt, len(raw_text), raw_text,
+                    "[Gemini] Response attempt=%d response_length=%d chars | tokens: in=%d out=%d | latency=%.1fms\nRESPONSE:\n%s",
+                    attempt, len(raw_text), input_tokens, output_tokens, latency_ms, raw_text,
                 )
                 return raw_text
 
@@ -499,11 +542,12 @@ class GeminiAgent:
     # Public API
     # ------------------------------------------------------------------
 
-    def generate(self, prompt: str) -> RecoveryDecision:
+    def generate(self, prompt: str, transaction_id: Optional[str] = None) -> RecoveryDecision:
         """Send a prompt to Gemini and return a validated ``RecoveryDecision``.
 
         Args:
             prompt: The full user prompt (typically built by ``build_cot_prompt``).
+            transaction_id: Optional transaction ID for cost logging.
 
         Returns:
             A ``RecoveryDecision`` with all fields validated.
@@ -514,21 +558,35 @@ class GeminiAgent:
             GeminiAgentError: If the API cannot be reached after retries.
             GeminiOutputParseError: If the response does not match the required schema.
         """
-        raw = self._call_api(prompt)
-        return self._parse_response(raw)
+        raw = self._call_api(prompt, transaction_id=transaction_id)
+        decision = self._parse_response(raw)
+        if self._last_call_meta:
+            decision.input_tokens = int(self._last_call_meta.get("input_tokens", 0))
+            decision.output_tokens = int(self._last_call_meta.get("output_tokens", 0))
+            decision.latency_ms = float(self._last_call_meta.get("latency_ms", 0.0))
+            decision.cost_usd = float(self._last_call_meta.get("cost_usd", 0.0))
+            decision.model = str(self._last_call_meta.get("model", self._model_name))
+        return decision
 
-    def decide(self, event: NormalizedEvent, ml_failure_category: Optional[str] = None) -> RecoveryDecision:
+    def decide(
+        self,
+        event: NormalizedEvent,
+        ml_failure_category: Optional[str] = None,
+        transaction_id: Optional[str] = None,
+    ) -> RecoveryDecision:
         """End-to-end convenience method: build CoT prompt → call API → parse output.
 
         Args:
             event: A ``NormalizedEvent`` from the webhook normaliser / ML classifier.
             ml_failure_category: Optional raw ML classifier failure category string.
+            transaction_id: Optional transaction ID for cost tracking.
 
         Returns:
             A validated ``RecoveryDecision``.
         """
         prompt = build_cot_prompt(event, ml_failure_category=ml_failure_category)
-        return self.generate(prompt)
+        tx_id = transaction_id or event.payment_id or event.entity_id
+        return self.generate(prompt, transaction_id=tx_id)
 
 
 # ---------------------------------------------------------------------------

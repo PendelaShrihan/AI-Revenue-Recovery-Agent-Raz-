@@ -146,3 +146,35 @@ class RecoveryAction(Base):
 
     def __repr__(self) -> str:
         return f"<RecoveryAction(id={self.id}, tx='{self.transaction_id}', type='{self.action_type}', status='{self.status}')>"
+
+
+class LLMCost(Base):
+    """
+    LLM Costs table model.
+    Tracks token usage, execution latency, and approximate cost per LLM invocation.
+    """
+    __tablename__ = "llm_costs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    transaction_id = Column(String(64), nullable=True, index=True)
+    model = Column(String(64), nullable=False)
+    input_tokens = Column(Integer, default=0, nullable=False)
+    output_tokens = Column(Integer, default=0, nullable=False)
+    cost_usd = Column(Float, default=0.0, nullable=False)
+    latency_ms = Column(Float, default=0.0, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "transaction_id": self.transaction_id,
+            "model": self.model,
+            "input_tokens": self.input_tokens,
+            "output_tokens": self.output_tokens,
+            "cost_usd": self.cost_usd,
+            "latency_ms": self.latency_ms,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+    def __repr__(self) -> str:
+        return f"<LLMCost(id={self.id}, tx='{self.transaction_id}', model='{self.model}', cost=${self.cost_usd:.6f})>"
