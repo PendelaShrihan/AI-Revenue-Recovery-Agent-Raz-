@@ -1,4 +1,4 @@
-# 🚀 AI Revenue Recovery Agent — Razorpay Hackathon Track 03
+# AI Revenue Recovery Agent — Razorpay Hackathon Track 03
 
 > **Autonomous diagnostic and revenue recovery engine for failed digital payments, subscription drops, and overdue receivables.**
 
@@ -56,7 +56,7 @@
 
 ---
 
-## 📌 Problem Statement
+## Problem Statement
 
 Digital payment failures cost Indian merchants millions in abandoned revenue daily. Standard payment infrastructure provides error codes but no autonomous recovery — someone must manually diagnose each failure, decide what to do, and execute a recovery action.
 
@@ -82,7 +82,7 @@ From `api_integration/schemas.py` `EventType` enum and `agent/SCOPE.md`:
 
 ---
 
-## 🎯 Track & Approach
+## Track & Approach
 
 **Track 03: AI Revenue Recovery**
 
@@ -106,7 +106,7 @@ The model was switched from `gemini-3.6-flash` (which hit quota limits at 20 RPD
 
 ---
 
-## 🏗 Architecture
+## Architecture
 
 ### Component Map (every file, every function)
 
@@ -350,7 +350,7 @@ UNIQUE constraint: `(transaction_id, attempt_number)` — named `uq_retry_attemp
 
 ---
 
-## ⚡ Key Features
+## Key Features
 
 All features below are implemented and tested — not planned.
 
@@ -404,7 +404,7 @@ All features below are implemented and tested — not planned.
 
 ---
 
-## 📊 Performance Results
+## Performance Results
 
 All numbers from actual measured execution (source: `tasks/lessons.md`).
 
@@ -414,12 +414,12 @@ Target: `< 3,000ms` per payment end-to-end
 
 | Run         | Latency     | Status                       |
 | ----------- | ----------- | ---------------------------- |
-| Payment 1   | 2,169ms     | ✅                           |
-| Payment 2   | 1,683ms     | ✅                           |
-| Payment 3   | 1,308ms     | ✅                           |
-| Payment 4   | 1,281ms     | ✅                           |
-| Payment 5   | 2,880ms     | ✅                           |
-| **Average** | **1,864ms** | ✅ well under 3,000ms target |
+| Payment 1   | 2,169ms     | Pass                         |
+| Payment 2   | 1,683ms     | [PASS] |
+| Payment 3   | 1,308ms     | [PASS] |
+| Payment 4   | 1,281ms     | [PASS] |
+| Payment 5   | 2,880ms     | [PASS] |
+| **Average** | **1,864ms** | Pass (well under 3,000ms target) |
 
 ### Cache Impact
 
@@ -468,23 +468,23 @@ Seeded via `agent/analytics.py` `seed_benchmark_dataset()`:
 Source: `tasks/lessons.md`
 
 ```
-insufficient_funds      → suggest_alternate_method ✅
-card_blocked            → suggest_alternate_method ✅
-network_timeout         → auto_retry               ✅
-gateway_issue           → auto_retry               ✅
-expired_card            → send_payment_link        ✅
-authentication_failed   → auto_retry               ✅
-limit_exceeded          → suggest_alternate_method ✅
-unknown                 → auto_retry               ✅
-subscription.halted     → auto_retry               ✅
-invoice.overdue         → auto_retry               ✅
-insufficient_funds_upi  → suggest_alternate_method ✅
+insufficient_funds      → suggest_alternate_method [PASS]
+card_blocked            → suggest_alternate_method [PASS]
+network_timeout         → auto_retry               [PASS]
+gateway_issue           → auto_retry               [PASS]
+expired_card            → send_payment_link        [PASS]
+authentication_failed   → auto_retry               [PASS]
+limit_exceeded          → suggest_alternate_method [PASS]
+unknown                 → auto_retry               [PASS]
+subscription.halted     → auto_retry               [PASS]
+invoice.overdue         → auto_retry               [PASS]
+insufficient_funds_upi  → suggest_alternate_method [PASS]
 Results: 11 passed, 0 failed | Total time: 38.5s
 ```
 
 ---
 
-## 🛠 Tech Stack
+## Tech Stack
 
 From `requirements.txt` and `docker-compose.yml`:
 
@@ -548,7 +548,7 @@ From `requirements.txt` and `docker-compose.yml`:
 
 ---
 
-## 🔴 Failure Categories & Recovery Actions
+## Failure Categories & Recovery Actions
 
 ### The 8 Canonical Categories (from `ml/error_codes.py`)
 
@@ -580,7 +580,7 @@ From `requirements.txt` and `docker-compose.yml`:
 
 ---
 
-## 🔌 API Reference
+## API Reference
 
 Base URL: `http://localhost:8000`
 
@@ -687,7 +687,7 @@ Flushes LLM response cache. Returns count of purged entries.
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
@@ -736,24 +736,24 @@ python main.py
 
 | Variable                     | Required | Default                                        | Description                                   |
 | ---------------------------- | -------- | ---------------------------------------------- | --------------------------------------------- |
-| `RAZORPAY_KEY_ID`            | ✅       | —                                              | Razorpay API Key ID (sandbox)                 |
-| `RAZORPAY_KEY_SECRET`        | ✅       | —                                              | Razorpay API Secret                           |
-| `RAZORPAY_WEBHOOK_SECRET`    | ✅       | —                                              | Webhook HMAC signing secret                   |
-| `GEMINI_API_KEY`             | ✅       | —                                              | Google Gemini API key                         |
-| `GEMINI_MODEL`               | ❌       | `gemini-flash-lite-latest`                     | Gemini model name                             |
-| `DEFAULT_LLM_PROVIDER`       | ❌       | `mock`                                         | `anthropic`, `openai`, `gemini`, or `mock`    |
-| `ANTHROPIC_API_KEY`          | ❌       | —                                              | Anthropic Claude API key                      |
-| `OPENAI_API_KEY`             | ❌       | —                                              | OpenAI API key                                |
-| `DATABASE_URL`               | ❌       | `sqlite:///./data/recovery_agent.db`           | Sync DB URL                                   |
-| `ASYNC_DATABASE_URL`         | ❌       | `sqlite+aiosqlite:///./data/recovery_agent.db` | Async DB URL                                  |
-| `MAX_RETRY_ATTEMPTS`         | ❌       | `3`                                            | Max automated retries per transaction         |
-| `RETRY_BASE_BACKOFF_MINUTES` | ❌       | `5`                                            | Base backoff delay in minutes                 |
-| `SIMULATION_MODE`            | ❌       | `true`                                         | Bypass webhook signature + auth for local dev |
-| `ENVIRONMENT`                | ❌       | `development`                                  | `development` or `production`                 |
-| `APP_SECRET_KEY`             | ❌       | —                                              | API key for REST endpoints                    |
-| `PORT`                       | ❌       | `8000`                                         | Server port                                   |
-| `HOST`                       | ❌       | `0.0.0.0`                                      | Server host                                   |
-| `OLLAMA_BASE_URL`            | ❌       | `http://localhost:11434`                       | Local Ollama base URL                         |
+| `RAZORPAY_KEY_ID`            | Yes      | —                                              | Razorpay API Key ID (sandbox)                 |
+| `RAZORPAY_KEY_SECRET`        | Yes      | —                                              | Razorpay API Secret                           |
+| `RAZORPAY_WEBHOOK_SECRET`    | Yes      | —                                              | Webhook HMAC signing secret                   |
+| `GEMINI_API_KEY`             | Yes      | —                                              | Google Gemini API key                         |
+| `GEMINI_MODEL`               | No     | `gemini-flash-lite-latest`                     | Gemini model name                             |
+| `DEFAULT_LLM_PROVIDER`       | No     | `mock`                                         | `anthropic`, `openai`, `gemini`, or `mock`    |
+| `ANTHROPIC_API_KEY`          | No     | —                                              | Anthropic Claude API key                      |
+| `OPENAI_API_KEY`             | No     | —                                              | OpenAI API key                                |
+| `DATABASE_URL`               | No     | `sqlite:///./data/recovery_agent.db`           | Sync DB URL                                   |
+| `ASYNC_DATABASE_URL`         | No     | `sqlite+aiosqlite:///./data/recovery_agent.db` | Async DB URL                                  |
+| `MAX_RETRY_ATTEMPTS`         | No     | `3`                                            | Max automated retries per transaction         |
+| `RETRY_BASE_BACKOFF_MINUTES` | No     | `5`                                            | Base backoff delay in minutes                 |
+| `SIMULATION_MODE`            | No     | `true`                                         | Bypass webhook signature + auth for local dev |
+| `ENVIRONMENT`                | No     | `development`                                  | `development` or `production`                 |
+| `APP_SECRET_KEY`             | No     | —                                              | API key for REST endpoints                    |
+| `PORT`                       | No     | `8000`                                         | Server port                                   |
+| `HOST`                       | No     | `0.0.0.0`                                      | Server host                                   |
+| `OLLAMA_BASE_URL`            | No     | `http://localhost:11434`                       | Local Ollama base URL                         |
 
 ### Available Scripts
 
@@ -770,7 +770,7 @@ python main.py
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 razorpay-recovery-agent/
@@ -850,7 +850,7 @@ razorpay-recovery-agent/
 
 ---
 
-## 🛡 Compliance & Safety
+## Compliance & Safety
 
 ### Stopping Rules (from `agent/retry_scheduler.py`)
 
@@ -885,17 +885,17 @@ Every state change (`retry_scheduled`, `alternate_suggested`, `customer_notified
 
 ---
 
-## 📈 Feasibility Analysis
+## Feasibility Analysis
 
 Projected vs. Actual (source: `tasks/lessons.md` + `agent/analytics.py`):
 
 | Metric                    | Projected | Actual                    |
 | ------------------------- | --------- | ------------------------- |
-| Recovery rate             | 40–60%    | **57.1%** ✅              |
-| LLM latency per call      | < 3,000ms | **1,864ms avg** ✅        |
-| ML classifier accuracy    | > 80%     | **100% on benchmark** ✅  |
-| Cost per LLM call         | < $0.001  | **$0.00020** ✅           |
-| Cost per recovery         | < $0.001  | **$0.00033–$0.00035** ✅  |
+| Recovery rate             | 40–60%    | **57.1%** (Target Met)              |
+| LLM latency per call      | < 3,000ms | **1,864ms avg** (Target Met)        |
+| ML classifier accuracy    | > 80%     | **100% on benchmark** (Target Met)  |
+| Cost per LLM call         | < $0.001  | **$0.00020** (Target Met)     |
+| Cost per recovery         | < $0.001  | **$0.00033–$0.00035** (Target Met) |
 | Monthly cost (156 tx/mo)  | —         | **$0.93 USD / ₹77.5 INR** |
 | Revenue saved (benchmark) | —         | **₹1,62,668.00**          |
 | ROI on inference spend    | —         | **> 2,000x**              |
@@ -908,7 +908,7 @@ Projected vs. Actual (source: `tasks/lessons.md` + `agent/analytics.py`):
 
 ---
 
-## ⚠️ Known Limitations
+## Known Limitations
 
 ### Not Built (Explicitly Out of Scope)
 
@@ -936,7 +936,7 @@ Projected vs. Actual (source: `tasks/lessons.md` + `agent/analytics.py`):
 
 ---
 
-## 🏗 Built With
+## Built With
 
 - **Hackathon**: Razorpay AI Buildathon 2026 — Track 03: AI Revenue Recovery
 - **Developer**: Shrihan (as documented in `tasks/todo.md`)
