@@ -183,6 +183,7 @@ class RecoveryDecision:
     latency_ms: float = 0.0
     cost_usd: float = 0.0
     model: str = ""
+    cached: bool = False
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any], raw: str = "") -> "RecoveryDecision":

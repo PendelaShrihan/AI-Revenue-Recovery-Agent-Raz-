@@ -461,3 +461,41 @@ async def get_costs_endpoint():
     from agent.cost_tracker import get_cost_summary
     return get_cost_summary()
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Endpoint 9: GET /cache/stats
+# ─────────────────────────────────────────────────────────────────────────────
+
+@rest_router.get(
+    "/cache/stats",
+    summary="LLM Response Cache Statistics",
+    description="Returns telemetry on cached LLM decisions, hit rate %, total lookups, and financial savings.",
+)
+async def get_cache_stats_endpoint():
+    """Returns telemetry and savings for the LLM response cache."""
+    from agent.llm_cache import get_llm_cache
+    return get_llm_cache().get_stats()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Endpoint 10: POST /cache/clear
+# ─────────────────────────────────────────────────────────────────────────────
+
+@rest_router.post(
+    "/cache/clear",
+    summary="Clear LLM Response Cache",
+    description="Flushes all cached LLM decisions and resets cache performance counters.",
+)
+async def clear_cache_endpoint(
+    auth: str = Depends(verify_merchant_auth),
+):
+    """Flushes the LLM response cache. Requires merchant authentication."""
+    from agent.llm_cache import get_llm_cache
+    cache = get_llm_cache()
+    stats_before = cache.get_stats()
+    cache.clear()
+    return {
+        "status": "success",
+        "message": f"LLM cache cleared ({stats_before['total_entries']} entries purged)",
+    }
+

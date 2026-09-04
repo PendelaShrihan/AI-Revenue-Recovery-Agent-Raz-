@@ -198,6 +198,7 @@ def run_recovery_pipeline(
         _log_step(3, f"Requesting Gemini recovery decision for failure_category='{failure_category}'")
         engine = _get_recovery_engine()
         decision = engine.process(normalized_event, ml_failure_category=failure_category)
+        is_cached = getattr(decision, "cached", False)
 
         decision_dict = {
             "action": decision.action,
@@ -211,7 +212,7 @@ def run_recovery_pipeline(
         _log_step(
             3,
             "Gemini decision received",
-            f"action='{decision.action}' priority='{decision.priority}' confidence={decision.confidence:.2f}",
+            f"action='{decision.action}' priority='{decision.priority}' confidence={decision.confidence:.2f} cached={is_cached}",
         )
 
         # ── Step 4: Dispatch recovery action ────────────────────────────────────
@@ -239,6 +240,7 @@ def run_recovery_pipeline(
             "confidence": decision.confidence,
             "db_record_id": dispatch_result.get("db_record_id"),
             "status": "recovery_initiated",
+            "cached": is_cached,
             "cost_usd": getattr(decision, "cost_usd", 0.0),
             "input_tokens": getattr(decision, "input_tokens", 0),
             "output_tokens": getattr(decision, "output_tokens", 0),

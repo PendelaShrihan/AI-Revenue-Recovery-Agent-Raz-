@@ -103,14 +103,20 @@ def run_latency_test(num_payments: int = 5) -> bool:
         elapsed_ms = (t_end - t_start) * 1000.0
         latencies_ms.append(elapsed_ms)
 
+        cached_tag = "⚡ CACHED" if summary.get("cached") else "🌐 COLD API"
         status_tag = "✅" if elapsed_ms <= TARGET_LATENCY_MS else "⚠️ SLOW"
-        print(f"Payment {i}: {elapsed_ms:.0f}ms {status_tag}")
+        print(f"Payment {i}: {elapsed_ms:.1f}ms {status_tag} [{cached_tag}]")
 
-        time.sleep(1.0)  # Gentle gap between API requests
+        time.sleep(0.5)
+
+    from agent.llm_cache import get_llm_cache
+    cache_stats = get_llm_cache().get_stats()
 
     avg_latency = sum(latencies_ms) / len(latencies_ms)
     print("───────────────────────────────────────────────────────")
-    print(f"Average: {avg_latency:.0f}ms")
+    print(f"Average Latency : {avg_latency:.1f}ms (Target: <{TARGET_LATENCY_MS:.0f}ms)")
+    print(f"Cache Hit Rate  : {cache_stats['hit_rate_pct']}% ({cache_stats['hits']} hits / {cache_stats['total_lookups']} lookups)")
+    print(f"Total Cost Saved: ${cache_stats['cost_saved_usd']:.5f} USD (~₹{cache_stats['cost_saved_inr']:.3f} INR)")
     print("=" * 55 + "\n")
 
     return avg_latency <= TARGET_LATENCY_MS

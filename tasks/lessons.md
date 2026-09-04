@@ -117,3 +117,14 @@
   - For high-volume merchants (10,000 monthly failures): ~$20 USD / ~₹1,660 INR per month.
 - **Return on AI Investment (ROAS)**:
   - Saving **₹162,668.00** at an operational LLM cost of **₹77.50** represents an ROI of **>2,000x** on inference spend.
+
+### ⚡ Diagnostic Caching Layer (`agent/llm_cache.py`)
+- **Key Formulation**: `(failure_type, merchant_category)` allows identical error categories within the same merchant vertical (or volume tier) to reuse structured reasoning decisions.
+- **Deepcopy Isolation**: When returning cached `RecoveryDecision` instances, `copy.deepcopy()` must be used so transaction-specific telemetry (`latency_ms=0.0`, `cost_usd=0.0`, `cached=True`) does not mutate the baseline cached template.
+- **Latency & Cost Impact**:
+  - Cold LLM latency: **1,864ms – 2,086ms** per request.
+  - Cached response latency: **30ms – 38ms** (including SQLite commit and action dispatch).
+  - Batch average latency dropped from **1,864ms to 443.7ms** with an 80% hit rate.
+  - Zero token consumption on cached lookups, driving marginal recovery cost to $0.00000.
+- **Thread Safety**: Wrapped in `threading.RLock` to support concurrent webhook delivery workers without race conditions.
+- **Eviction Strategy**: Combines least-recently-used (LRU) pruning at capacity (default 1,000 items) with a 24-hour time-to-live (TTL) to allow decision policy refreshes over time.

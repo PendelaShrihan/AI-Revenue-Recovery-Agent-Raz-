@@ -163,6 +163,12 @@ def get_cost_summary(session: Optional[Session] = None) -> Dict[str, Any]:
             est_monthly_usd = 0.01
         est_monthly_inr = round(est_monthly_usd * USD_TO_INR_RATE, 1)
 
+    try:
+        from agent.llm_cache import get_llm_cache
+        cache_stats = get_llm_cache().get_stats()
+    except Exception:
+        cache_stats = {}
+
     return {
         "total_llm_calls": total_calls_int,
         "total_input_tokens": int(total_input),
@@ -173,6 +179,7 @@ def get_cost_summary(session: Optional[Session] = None) -> Dict[str, Any]:
         "estimated_monthly_cost_inr": est_monthly_inr,
         "model_used": model_used,
         "avg_latency_ms": round(float(avg_latency), 1),
+        "cache_savings": cache_stats,
     }
 
 
