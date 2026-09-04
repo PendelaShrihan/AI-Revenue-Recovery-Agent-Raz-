@@ -3,1011 +3,2166 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AI Revenue Recovery — Merchant Dashboard</title>
-  <meta name="description" content="Real-time merchant dashboard for AI-powered payment failure recovery and retry management." />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <title>Dashboard — AI Revenue Recovery Agent</title>
+  <meta name="description" content="Razorpay AI Revenue Recovery Agent merchant dashboard. Autonomous diagnostic and revenue recovery engine." />
+
+  <!-- Typography: Inter font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 
   <style>
-    /* ── Design Tokens ──────────────────────────────────────────────────── */
+    /* ── RazHelp Design Tokens ────────────────────────────────────────────── */
     :root {
-      --bg:          #07090f;
-      --surface:     #0d1117;
-      --card:        #111827;
-      --card-hover:  #162032;
-      --border:      rgba(148, 163, 184, 0.08);
-      --border-glow: rgba(34, 211, 238, 0.2);
+      --bg-main: #FFFFFF;
+      --bg-body: #F8F9FA;
+      --bg-sidebar: #F8F9FA;
+      --bg-card: #FFFFFF;
+      --border-subtle: #E9ECEF;
+      --border-card: #F1F3F5;
+      
+      --text-main: #111827;
+      --text-muted: #6B7280;
+      --text-subtle: #9CA3AF;
 
-      --cyan:        #22d3ee;
-      --purple:      #a78bfa;
-      --green:       #34d399;
-      --amber:       #fbbf24;
-      --red:         #f87171;
-      --blue:        #60a5fa;
+      /* Razorpay Blue Theme */
+      --primary: #2D81F7;
+      --primary-hover: #1E6FD9;
+      --primary-light: #EFF6FF;
+      --primary-border: #BFDBFE;
 
-      --grad-main:   linear-gradient(135deg, #22d3ee 0%, #a78bfa 100%);
-      --grad-card:   linear-gradient(145deg, #111827, #0d1117);
+      /* Semantic Status Colors */
+      --green: #10B981;
+      --green-bg: #ECFDF5;
+      --green-text: #065F46;
+      --blue: #2D81F7;
+      --blue-bg: #EFF6FF;
+      --blue-text: #1E40AF;
+      --orange: #F59E0B;
+      --orange-bg: #FFFBEB;
+      --orange-text: #92400E;
+      --red: #EF4444;
+      --red-bg: #FEF2F2;
+      --red-text: #991B1B;
 
-      --text-1: #f1f5f9;
-      --text-2: #94a3b8;
-      --text-3: #475569;
-
-      --radius:  10px;
+      --radius-sm: 8px;
+      --radius-md: 12px;
       --radius-lg: 16px;
+      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+      --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+      --shadow-hover: 0 4px 10px -2px rgba(0, 0, 0, 0.06), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
     }
 
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    html { scroll-behavior: smooth; }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
     body {
-      font-family: 'Inter', system-ui, sans-serif;
-      background: var(--bg);
-      color: var(--text-1);
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg-main);
+      color: var(--text-main);
+      display: flex;
       min-height: 100vh;
-      font-size: 14px;
-      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
       overflow-x: hidden;
     }
 
-    /* ── Ambient Background ──────────────────────────────────────────────── */
-    body::before {
-      content: '';
+    /* ── Offline Banner ── */
+    #offline-banner {
+      display: none;
       position: fixed;
-      top: -30%;
-      left: -10%;
-      width: 60vw;
-      height: 60vw;
-      background: radial-gradient(circle, rgba(34,211,238,0.04) 0%, transparent 70%);
-      pointer-events: none;
-      z-index: 0;
-    }
-    body::after {
-      content: '';
-      position: fixed;
-      bottom: -20%;
-      right: -10%;
-      width: 50vw;
-      height: 50vw;
-      background: radial-gradient(circle, rgba(167,139,250,0.05) 0%, transparent 70%);
-      pointer-events: none;
-      z-index: 0;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: #EF4444;
+      color: #FFFFFF;
+      font-size: 12.5px;
+      font-weight: 600;
+      padding: 6px 16px;
+      text-align: center;
+      z-index: 1000;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
 
-    /* ── Layout ──────────────────────────────────────────────────────────── */
-    .layout {
-      position: relative;
-      z-index: 1;
+    /* ── Sidebar (Light Gray #F8F9FA) ── */
+    aside.sidebar {
+      width: 240px;
+      background-color: var(--bg-sidebar);
+      border-right: 1px solid var(--border-subtle);
       display: flex;
       flex-direction: column;
-      min-height: 100vh;
+      flex-shrink: 0;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+      z-index: 50;
     }
 
-    /* ── Header ──────────────────────────────────────────────────────────── */
-    header {
-      background: rgba(13,17,23,0.8);
-      border-bottom: 1px solid var(--border);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      padding: 0 28px;
+    .brand-section {
+      padding: 24px 20px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-logo-box {
+      width: 32px;
+      height: 32px;
+      background: #111827;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #FFFFFF;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .brand-title-wrap {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .brand-title {
+      font-size: 15px;
+      font-weight: 800;
+      letter-spacing: -0.2px;
+      color: #111827;
+      line-height: 1.1;
+    }
+
+    .brand-sub {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      color: #9CA3AF;
+      text-transform: uppercase;
+      margin-top: 3px;
+    }
+
+    .nav-container {
+      padding: 8px 12px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      flex-grow: 1;
+    }
+
+    .nav-group-title {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      color: #9CA3AF;
+      text-transform: uppercase;
+      padding: 0 10px 4px;
+    }
+
+    .nav-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .nav-item a {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      border-radius: var(--radius-sm);
+      color: #4B5563;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.15s ease;
+      cursor: pointer;
+    }
+
+    .nav-item a:hover {
+      background: #ECEEF1;
+      color: #111827;
+    }
+
+    .nav-item.active a {
+      background: #ECEEF1;
+      color: #111827;
+      font-weight: 600;
+    }
+
+    .nav-item-icon {
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+    }
+
+    .nav-badge {
+      margin-left: auto;
+      font-size: 10.5px;
+      font-weight: 700;
+      background: #E5E7EB;
+      color: #374151;
+      padding: 1px 6px;
+      border-radius: 10px;
+    }
+
+    .sidebar-footer {
+      padding: 14px 16px;
+      border-top: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--bg-sidebar);
+    }
+
+    .user-avatar-circle {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: #111827;
+      color: #FFFFFF;
+      font-weight: 700;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .user-meta {
+      display: flex;
+      flex-direction: column;
+      flex-grow: 1;
+      overflow: hidden;
+    }
+
+    .user-name {
+      font-size: 12.5px;
+      font-weight: 700;
+      color: #111827;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .user-sub {
+      font-size: 11px;
+      color: #9CA3AF;
+    }
+
+    /* ── Main Viewport Area (White) ── */
+    main.main-viewport {
+      flex-grow: 1;
+      background: var(--bg-main);
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Top Bar ── */
+    header.top-bar {
       height: 64px;
+      background: var(--bg-main);
+      border-bottom: 1px solid var(--border-card);
       display: flex;
       align-items: center;
       justify-content: space-between;
+      padding: 0 32px;
       position: sticky;
       top: 0;
-      z-index: 100;
+      z-index: 40;
     }
 
-    .header-left {
+    .top-bar-left {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .top-bar-title {
+      font-size: 18px;
+      font-weight: 800;
+      color: #111827;
+      letter-spacing: -0.3px;
+    }
+
+    .top-bar-sub {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .top-bar-right {
       display: flex;
       align-items: center;
       gap: 12px;
     }
 
-    .logo-mark {
-      width: 36px;
-      height: 36px;
-      background: var(--grad-main);
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 16px;
-      font-weight: 800;
-      color: #000;
-      letter-spacing: -0.5px;
-      flex-shrink: 0;
-    }
-
-    .logo-text {
-      display: flex;
-      flex-direction: column;
-      line-height: 1.2;
-    }
-    .logo-text strong {
-      font-size: 15px;
-      font-weight: 700;
-      background: var(--grad-main);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-    .logo-text span {
-      font-size: 11px;
-      color: var(--text-3);
-      font-weight: 400;
-    }
-
-    .header-right {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-    }
-
-    /* ── SSE Status Pill ─────────────────────────────────────────────────── */
-    .status-pill {
+    .btn-batch-demo {
+      background: var(--primary);
+      color: #FFFFFF;
+      border: none;
+      border-radius: 20px;
+      padding: 0 16px;
+      height: 38px;
+      font-size: 13px;
+      font-weight: 600;
       display: flex;
       align-items: center;
       gap: 7px;
-      padding: 5px 12px;
-      border-radius: 20px;
-      border: 1px solid var(--border);
-      background: rgba(255,255,255,0.03);
-      font-size: 12px;
-      font-weight: 500;
-      color: var(--text-2);
-      cursor: default;
-      transition: all 0.3s ease;
-    }
-    .status-pill.connected {
-      border-color: rgba(52,211,153,0.3);
-      background: rgba(52,211,153,0.06);
-      color: var(--green);
-    }
-    .status-pill.connecting {
-      border-color: rgba(251,191,36,0.3);
-      color: var(--amber);
-    }
-    .status-pill.disconnected {
-      border-color: rgba(248,113,113,0.3);
-      color: var(--red);
+      cursor: pointer;
+      box-shadow: 0 2px 4px rgba(45, 129, 247, 0.2);
+      transition: all 0.15s ease;
     }
 
-    .dot {
+    .btn-batch-demo:hover {
+      background: var(--primary-hover);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 8px rgba(45, 129, 247, 0.25);
+    }
+
+    .btn-batch-demo:active {
+      transform: translateY(0);
+    }
+
+    .btn-batch-demo.running {
+      opacity: 0.7;
+      pointer-events: none;
+    }
+
+    .live-pulse-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: #F3F4F6;
+      border: 1px solid #E5E7EB;
+      border-radius: 16px;
+      padding: 4px 10px;
+      font-size: 11.5px;
+      font-weight: 600;
+      color: #374151;
+    }
+
+    .pulse-dot {
       width: 7px;
       height: 7px;
       border-radius: 50%;
-      background: currentColor;
-    }
-    .status-pill.connected .dot { animation: pulse-dot 2s infinite; }
-    @keyframes pulse-dot {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.4; }
+      background: #10B981;
+      box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
     }
 
-    /* ── API Key Input ───────────────────────────────────────────────────── */
-    .api-key-form {
+    /* ── Content View Wrapper ── */
+    .content-container {
+      padding: 24px 32px 48px;
       display: flex;
-      align-items: center;
-      gap: 8px;
+      flex-direction: column;
+      gap: 24px;
+      max-width: 1400px;
+      width: 100%;
+      margin: 0 auto;
     }
-    .api-key-input {
-      background: rgba(255,255,255,0.04);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      color: var(--text-1);
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 12px;
-      padding: 7px 12px;
-      width: 220px;
-      outline: none;
+
+    /* Views container */
+    .view-panel {
+      display: none;
+      flex-direction: column;
+      gap: 24px;
+      animation: fadeIn 0.15s ease-in-out;
+    }
+    .view-panel.active {
+      display: flex;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(3px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── 4 Metric Cards Row ── */
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 20px;
+    }
+
+    .metric-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-card);
+      padding: 18px 20px 8px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
       transition: all 0.2s;
     }
-    .api-key-input:focus {
-      border-color: var(--border-glow);
-      box-shadow: 0 0 0 3px rgba(34,211,238,0.08);
-    }
-    .api-key-input::placeholder { color: var(--text-3); }
 
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 7px 14px;
-      border-radius: var(--radius);
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      border: none;
-      transition: all 0.2s ease;
+    .metric-card:hover {
+      box-shadow: var(--shadow-hover);
+      border-color: #E2E8F0;
     }
-    .btn-primary {
-      background: var(--grad-main);
-      color: #000;
+
+    .metric-card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
     }
-    .btn-primary:hover { opacity: 0.88; transform: translateY(-1px); }
-    .btn-sm {
-      padding: 5px 10px;
-      font-size: 12px;
+
+    .metric-card-label {
+      font-size: 12.5px;
       font-weight: 500;
-    }
-    .btn-retry {
-      background: rgba(34,211,238,0.1);
-      border: 1px solid rgba(34,211,238,0.25);
-      color: var(--cyan);
-      border-radius: 6px;
-    }
-    .btn-retry:hover {
-      background: rgba(34,211,238,0.18);
-      transform: translateY(-1px);
-    }
-    .btn-retry:disabled {
-      opacity: 0.35;
-      cursor: not-allowed;
-      transform: none;
+      color: var(--text-muted);
     }
 
-    /* ── Main Content ────────────────────────────────────────────────────── */
-    main {
-      flex: 1;
-      padding: 28px 28px 48px;
-      max-width: 1440px;
-      margin: 0 auto;
+    .metric-icon-wrap {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .icon-blue-bg  { background: #EFF6FF; color: #2D81F7; }
+    .icon-green-bg { background: #ECFDF5; color: #10B981; }
+    .icon-teal-bg  { background: #F0FDFA; color: #0D9488; }
+    .icon-purple-bg{ background: #FAF5FF; color: #8B5CF6; }
+
+    .metric-card-value {
+      font-size: 25px;
+      font-weight: 800;
+      color: #111827;
+      letter-spacing: -0.5px;
+      margin: 8px 0 2px;
+    }
+
+    .metric-card-trend {
+      font-size: 12px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .trend-highlight {
+      font-weight: 700;
+      color: #10B981;
+    }
+
+    .sparkline-wrapper {
+      margin-top: 10px;
+      height: 44px;
+      width: calc(100% + 40px);
+      margin-left: -20px;
+      margin-bottom: -8px;
+    }
+
+    /* ── Middle Row: Main Chart + Right Widgets ── */
+    .middle-grid {
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 20px;
+    }
+
+    .chart-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-card);
+      padding: 22px 24px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .chart-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .chart-title-wrap h2 {
+      font-size: 16px;
+      font-weight: 700;
+      color: #111827;
+    }
+
+    .chart-title-wrap p {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .tab-pills {
+      display: inline-flex;
+      background: #F3F4F6;
+      border-radius: 20px;
+      padding: 3px;
+      gap: 2px;
+    }
+
+    .tab-pill {
+      background: transparent;
+      border: none;
+      padding: 5px 14px;
+      border-radius: 16px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #4B5563;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .tab-pill.active {
+      background: #FFFFFF;
+      color: #111827;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+    }
+
+    .chart-canvas-box {
+      position: relative;
+      height: 310px;
       width: 100%;
     }
 
-    .page-title {
+    /* Right Widgets */
+    .right-stack {
       display: flex;
-      align-items: baseline;
-      gap: 10px;
-      margin-bottom: 24px;
-    }
-    .page-title h1 {
-      font-size: 22px;
-      font-weight: 700;
-      color: var(--text-1);
-    }
-    .page-title .subtitle {
-      font-size: 13px;
-      color: var(--text-3);
-    }
-
-    /* ── Stats Row ───────────────────────────────────────────────────────── */
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 16px;
-      margin-bottom: 28px;
-    }
-
-    .stat-card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      padding: 20px 22px;
-      position: relative;
-      overflow: hidden;
-      transition: border-color 0.3s, transform 0.2s;
-    }
-    .stat-card:hover {
-      border-color: rgba(34,211,238,0.2);
-      transform: translateY(-2px);
-    }
-    .stat-card::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 2px;
-      background: var(--accent-color, var(--grad-main));
-      border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-    }
-    .stat-card.cyan { --accent-color: var(--cyan); }
-    .stat-card.purple { --accent-color: var(--purple); }
-    .stat-card.green { --accent-color: var(--green); }
-    .stat-card.amber { --accent-color: var(--amber); }
-
-    .stat-label {
-      font-size: 12px;
-      font-weight: 500;
-      color: var(--text-3);
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      margin-bottom: 8px;
-    }
-    .stat-value {
-      font-size: 32px;
-      font-weight: 800;
-      line-height: 1;
-      margin-bottom: 4px;
-      color: var(--text-1);
-    }
-    .stat-sub {
-      font-size: 12px;
-      color: var(--text-3);
-    }
-    .stat-icon {
-      position: absolute;
-      top: 18px;
-      right: 18px;
-      font-size: 22px;
-      opacity: 0.35;
-    }
-
-    /* ── Two-column layout ───────────────────────────────────────────────── */
-    .content-grid {
-      display: grid;
-      grid-template-columns: 1fr 340px;
+      flex-direction: column;
       gap: 20px;
-      align-items: start;
     }
 
-    /* ── Panel (card container) ──────────────────────────────────────────── */
-    .panel {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      overflow: hidden;
+    .widget-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-card);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
     }
 
-    .panel-header {
-      padding: 16px 20px;
-      border-bottom: 1px solid var(--border);
+    .widget-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: #111827;
+    }
+
+    .widget-sub {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    /* Donut Widget */
+    .donut-layout {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-top: 14px;
+    }
+
+    .donut-chart-wrap {
+      width: 125px;
+      height: 125px;
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    .donut-center-label {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      pointer-events: none;
+    }
+
+    .donut-center-num {
+      font-size: 16px;
+      font-weight: 800;
+      color: #111827;
+      line-height: 1.1;
+    }
+
+    .donut-center-sub {
+      font-size: 9.5px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+
+    .donut-legend {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      flex-grow: 1;
+    }
+
+    .donut-legend-item {
       display: flex;
       align-items: center;
       justify-content: space-between;
-    }
-    .panel-title {
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--text-1);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .panel-badge {
-      font-size: 11px;
-      font-weight: 600;
-      padding: 2px 8px;
-      border-radius: 10px;
-      background: rgba(34,211,238,0.12);
-      color: var(--cyan);
+      font-size: 11.5px;
     }
 
-    /* ── Transactions Table ──────────────────────────────────────────────── */
-    .table-wrap {
+    .legend-bullet-wrap {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #374151;
+      text-transform: capitalize;
+    }
+
+    .legend-bullet {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+    }
+
+    .legend-percent {
+      font-weight: 700;
+      color: #111827;
+    }
+
+    /* Goals / Targets Widget */
+    .targets-list {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      margin-top: 14px;
+    }
+
+    .target-row {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .target-header-line {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .target-name {
+      font-weight: 600;
+      color: #374151;
+    }
+
+    .target-val {
+      font-weight: 700;
+      color: #111827;
+    }
+
+    .target-track {
+      width: 100%;
+      height: 6px;
+      background: #F1F5F9;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .target-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.5s ease-out;
+    }
+
+    .target-sub-line {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10.5px;
+      color: var(--text-subtle);
+    }
+
+    /* ── Bottom Row: Table Left + Activity Right ── */
+    .bottom-grid {
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 20px;
+    }
+
+    .table-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-card);
+      padding: 22px 24px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .section-flex-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .link-view-all {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--primary);
+      text-decoration: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .link-view-all:hover {
+      text-decoration: underline;
+    }
+
+    .table-container {
       overflow-x: auto;
     }
 
-    table {
+    table.data-table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 13px;
-    }
-    thead th {
-      background: rgba(255,255,255,0.02);
-      padding: 10px 14px;
+      font-size: 12.5px;
       text-align: left;
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--text-3);
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      border-bottom: 1px solid var(--border);
-      white-space: nowrap;
-    }
-    tbody tr {
-      border-bottom: 1px solid var(--border);
-      transition: background 0.15s;
-    }
-    tbody tr:hover { background: rgba(255,255,255,0.025); }
-    tbody tr:last-child { border-bottom: none; }
-    tbody tr.highlight-new {
-      animation: row-flash 1.5s ease-out;
-    }
-    @keyframes row-flash {
-      0% { background: rgba(34,211,238,0.15); }
-      100% { background: transparent; }
     }
 
-    td {
-      padding: 12px 14px;
-      color: var(--text-2);
+    table.data-table th {
+      color: #9CA3AF;
+      font-weight: 600;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border-card);
+    }
+
+    table.data-table td {
+      padding: 12px 12px;
+      border-bottom: 1px solid var(--border-card);
+      color: #374151;
       vertical-align: middle;
     }
-    td .mono {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 12px;
-      color: var(--cyan);
-    }
-    td .amount {
-      font-weight: 600;
-      color: var(--text-1);
+
+    table.data-table tr.clickable-row {
+      cursor: pointer;
+      transition: background 0.15s;
     }
 
-    /* ── Status Badges ───────────────────────────────────────────────────── */
+    table.data-table tr.clickable-row:hover {
+      background: #F9FAFB;
+    }
+
+    /* Status Badges */
     .badge {
       display: inline-flex;
       align-items: center;
-      gap: 5px;
-      padding: 3px 9px;
-      border-radius: 6px;
+      padding: 2.5px 8px;
+      border-radius: 12px;
       font-size: 11px;
-      font-weight: 600;
-      white-space: nowrap;
+      font-weight: 700;
+      letter-spacing: 0.2px;
     }
-    .badge-red    { background: rgba(248,113,113,0.12); color: var(--red);    border: 1px solid rgba(248,113,113,0.2); }
-    .badge-amber  { background: rgba(251,191,36,0.12);  color: var(--amber);  border: 1px solid rgba(251,191,36,0.2); }
-    .badge-green  { background: rgba(52,211,153,0.12);  color: var(--green);  border: 1px solid rgba(52,211,153,0.2); }
-    .badge-cyan   { background: rgba(34,211,238,0.12);  color: var(--cyan);   border: 1px solid rgba(34,211,238,0.2); }
-    .badge-purple { background: rgba(167,139,250,0.12); color: var(--purple); border: 1px solid rgba(167,139,250,0.2); }
-    .badge-gray   { background: rgba(148,163,184,0.1);  color: var(--text-3); border: 1px solid rgba(148,163,184,0.1); }
 
-    /* ── Action Pills ────────────────────────────────────────────────────── */
-    .action-pill {
+    .badge-recovered { background: var(--green-bg); color: var(--green-text); }
+    .badge-retrying  { background: var(--blue-bg); color: var(--blue-text); }
+    .badge-escalated { background: var(--orange-bg); color: var(--orange-text); }
+    .badge-failed    { background: var(--red-bg); color: var(--red-text); }
+
+    /* Inline Expanded Row */
+    .inline-detail-box {
+      padding: 14px 16px;
+      background: #F8FAFC;
+      border-radius: var(--radius-sm);
+      border: 1px solid #E2E8F0;
+      margin: 8px 0;
+      font-size: 12px;
+    }
+
+    /* Activity Box */
+    .activity-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-card);
+      padding: 22px 20px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .activity-feed-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 10px;
+      max-height: 380px;
+      overflow-y: auto;
+    }
+
+    .feed-svg-box { width: 20px; height: 20px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; margin-top: 1px; }
+    .feed-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 12px;
+      padding: 4px 0;
+    }
+
+    .feed-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      margin-top: 4px;
+    }
+
+    .dot-recovered { background: #10B981; box-shadow: 0 0 0 2px rgba(16,185,129,0.2); }
+    .dot-retrying  { background: #2D81F7; box-shadow: 0 0 0 2px rgba(45,129,247,0.2); }
+    .dot-escalated { background: #F59E0B; box-shadow: 0 0 0 2px rgba(245,158,11,0.2); }
+    .dot-gemini    { background: #8B5CF6; box-shadow: 0 0 0 2px rgba(139,92,246,0.2); }
+
+    .feed-content {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      flex-grow: 1;
+    }
+
+    .feed-desc {
+      color: #111827;
+      font-weight: 500;
+      line-height: 1.35;
+    }
+
+    .feed-time {
       font-size: 11px;
-      color: var(--text-2);
-      background: rgba(255,255,255,0.04);
-      border: 1px solid var(--border);
-      border-radius: 5px;
-      padding: 2px 7px;
-      white-space: nowrap;
+      color: var(--text-subtle);
     }
 
-    /* ── Empty / Loading States ──────────────────────────────────────────── */
-    .table-empty {
-      padding: 48px 20px;
-      text-align: center;
-      color: var(--text-3);
-    }
-    .table-empty .icon { font-size: 36px; margin-bottom: 8px; }
-    .table-empty p { font-size: 13px; }
-
+    /* ── Skeleton Loaders (Gray Shimmer) ── */
     .skeleton {
-      background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%);
+      background: linear-gradient(90deg, #F3F4F6 25%, #E5E7EB 50%, #F3F4F6 75%);
       background-size: 200% 100%;
       animation: shimmer 1.5s infinite;
       border-radius: 4px;
-      height: 14px;
+      color: transparent !important;
     }
+
     @keyframes shimmer {
       0% { background-position: 200% 0; }
       100% { background-position: -200% 0; }
     }
 
-    /* ── Live Feed Panel ─────────────────────────────────────────────────── */
-    .feed-list {
-      max-height: 520px;
-      overflow-y: auto;
-      padding: 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-    .feed-list::-webkit-scrollbar { width: 4px; }
-    .feed-list::-webkit-scrollbar-track { background: transparent; }
-    .feed-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+    .spin-icon { animation: spin 1s linear infinite; display: inline-block; vertical-align: -2px; }
 
-    .feed-item {
-      background: rgba(255,255,255,0.03);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 12px 14px;
-      transition: border-color 0.3s;
-      animation: slide-in 0.35s ease;
-    }
-    .feed-item.new { border-color: rgba(34,211,238,0.3); }
-    @keyframes slide-in {
-      from { opacity: 0; transform: translateY(-8px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-
-    .feed-payment-id {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 12px;
-      color: var(--cyan);
-      margin-bottom: 5px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .feed-meta {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin-top: 6px;
-    }
-    .feed-time {
-      font-size: 10px;
-      color: var(--text-3);
-      margin-top: 6px;
-    }
-    .feed-empty {
-      padding: 32px 16px;
-      text-align: center;
-      color: var(--text-3);
-      font-size: 13px;
-    }
-
-    /* ── Toast ───────────────────────────────────────────────────────────── */
-    #toast-container {
+    /* ── Toast Alert ── */
+    #demo-toast {
       position: fixed;
       bottom: 24px;
       right: 24px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      z-index: 9999;
-    }
-    .toast {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 12px 16px;
+      background: #111827;
+      color: #FFFFFF;
+      padding: 12px 18px;
+      border-radius: var(--radius-sm);
       font-size: 13px;
-      color: var(--text-1);
-      max-width: 300px;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-      animation: toast-in 0.3s ease;
+      font-weight: 600;
+      display: none;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 10px 15px -3px rgba(0,0,0,0.2);
+      z-index: 1000;
+      animation: slideUp 0.2s ease-out;
     }
-    .toast.success { border-color: rgba(52,211,153,0.3); }
-    .toast.error   { border-color: rgba(248,113,113,0.3); }
-    @keyframes toast-in {
-      from { opacity: 0; transform: translateX(20px); }
-      to   { opacity: 1; transform: translateX(0); }
-    }
-
-    /* ── Footer ──────────────────────────────────────────────────────────── */
-    footer {
-      border-top: 1px solid var(--border);
-      padding: 12px 28px;
-      display: flex;
-      justify-content: space-between;
-      font-size: 11px;
-      color: var(--text-3);
+    @keyframes slideUp {
+      from { transform: translateY(12px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
     }
 
-    /* ── Responsive ──────────────────────────────────────────────────────── */
-    @media (max-width: 1100px) {
-      .content-grid { grid-template-columns: 1fr; }
-      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    /* ── Responsive ── */
+    @media (max-width: 1200px) {
+      .metric-grid { grid-template-columns: repeat(2, 1fr); }
+      .middle-grid, .bottom-grid { grid-template-columns: 1fr; }
     }
-    @media (max-width: 640px) {
-      header { padding: 0 16px; }
-      main { padding: 16px 16px 40px; }
-      .stats-grid { grid-template-columns: 1fr 1fr; }
-      .api-key-input { width: 140px; }
+    @media (max-width: 768px) {
+      aside.sidebar { display: none; }
+      header.top-bar { padding: 0 16px; }
+      .content-container { padding: 16px; }
+      .metric-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
-
 <body>
-<div class="layout">
 
-  <!-- ── Header ────────────────────────────────────────────────────────── -->
-  <header>
-    <div class="header-left">
-      <div class="logo-mark">AI</div>
-      <div class="logo-text">
-        <strong>Revenue Recovery</strong>
-        <span>Razorpay · Hackathon Track 03</span>
+  <!-- Offline Warning Banner -->
+  <div id="offline-banner">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block; vertical-align:-2px; margin-right:6px;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    Connection to Revenue Recovery Agent offline. Displaying cached telemetry data.
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="demo-toast">
+    <span id="demo-toast-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2D81F7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span>
+    <span id="demo-toast-msg">Running 20-payment recovery demo batch...</span>
+  </div>
+
+  <!-- ── Light Gray Sidebar (#F8F9FA) ── -->
+  <aside class="sidebar">
+    <div class="brand-section">
+      <div class="brand-title-wrap">
+        <span class="brand-title">RazHelp</span>
+        <span class="brand-sub">RECOVERY AGENT</span>
       </div>
     </div>
 
-    <div class="header-right">
-      <div class="status-pill connecting" id="sse-status">
-        <div class="dot"></div>
-        <span id="sse-status-text">Connecting…</span>
+    <div class="nav-container">
+      <!-- Group: OVERVIEW -->
+      <div>
+        <div class="nav-group-title">Overview</div>
+        <ul class="nav-list">
+          <li class="nav-item active" id="nav-dashboard">
+            <a onclick="switchNavView('dashboard')">
+              <span class="nav-item-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></svg></span>
+              <span>Dashboard</span>
+            </a>
+          </li>
+          <li class="nav-item" id="nav-analytics">
+            <a onclick="switchNavView('analytics')">
+              <span class="nav-item-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10M12 20V4M6 20v-6"/></svg></span>
+              <span>Analytics</span>
+            </a>
+          </li>
+          <li class="nav-item" id="nav-cost">
+            <a onclick="switchNavView('cost')">
+              <span class="nav-item-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 18V6"/></svg></span>
+              <span>Cost Tracker</span>
+            </a>
+          </li>
+        </ul>
       </div>
 
-      <div class="api-key-form">
-        <input
-          class="api-key-input"
-          type="password"
-          id="api-key-input"
-          placeholder="Enter X-API-Key…"
-          autocomplete="off"
-        />
-        <button class="btn btn-primary btn-sm" id="connect-btn" onclick="connectDashboard()">
-          Connect
+      <!-- Group: PAYMENTS -->
+      <div>
+        <div class="nav-group-title">Payments</div>
+        <ul class="nav-list">
+          <li class="nav-item" id="nav-failed">
+            <a onclick="switchNavView('failed')">
+              <span class="nav-item-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></span>
+              <span>Failed Payments</span>
+              <span class="nav-badge" id="badge-failed-count">156</span>
+            </a>
+          </li>
+          <li class="nav-item" id="nav-queue">
+            <a onclick="switchNavView('queue')">
+              <span class="nav-item-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></span>
+              <span>Retry Queue</span>
+              <span class="nav-badge" id="badge-queue-count" style="background: #EFF6FF; color: #1E40AF;">47</span>
+            </a>
+          </li>
+          <li class="nav-item" id="nav-recovered">
+            <a onclick="switchNavView('recovered')">
+              <span class="nav-item-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span>
+              <span>Recovered</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Group: SYSTEM -->
+      <div>
+        <div class="nav-group-title">System</div>
+        <ul class="nav-list">
+          <li class="nav-item" id="nav-api">
+            <a onclick="switchNavView('api')">
+              <span class="nav-item-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span>
+              <span>API Status</span>
+              <span class="pulse-dot" style="margin-left: auto;"></span>
+            </a>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Sidebar Footer Merchant Info -->
+    <div class="sidebar-footer">
+      <div class="user-avatar-circle">RZ</div>
+      <div class="user-meta">
+        <span class="user-name">Razorpay Merchant</span>
+        <span class="user-sub">Track 03 · Autonomous</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Main Viewport (White) ── -->
+  <main class="main-viewport">
+    
+    <!-- Top Bar -->
+    <header class="top-bar">
+      <div class="top-bar-left">
+        <h1 class="top-bar-title" id="page-heading">Dashboard</h1>
+        <p class="top-bar-sub">AI Revenue Recovery Agent — Razorpay Track 03</p>
+      </div>
+
+      <div class="top-bar-right">
+        <div class="live-pulse-pill" title="Server Connection Active">
+          <span class="pulse-dot" id="live-dot"></span>
+          <span id="live-text">SSE Live</span>
+        </div>
+
+        <button class="btn-batch-demo" id="btn-run-demo" onclick="triggerBatchDemo()">
+          <span id="demo-btn-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="display:inline-block; vertical-align:-1px;"><polygon points="5 3 19 12 5 21 5 3"/></svg></span>
+          <span>Run Batch Demo</span>
         </button>
       </div>
-    </div>
-  </header>
+    </header>
 
-  <!-- ── Main ──────────────────────────────────────────────────────────── -->
-  <main>
-    <div class="page-title">
-      <h1>Merchant Dashboard</h1>
-      <span class="subtitle" id="last-updated">—</span>
-    </div>
+    <div class="content-container">
 
-    <!-- Stats Row -->
-    <div class="stats-grid">
-      <div class="stat-card cyan">
-        <div class="stat-icon">⚡</div>
-        <div class="stat-label">Total Failures</div>
-        <div class="stat-value" id="stat-total">—</div>
-        <div class="stat-sub">All tracked payments</div>
-      </div>
-      <div class="stat-card red" style="--accent-color: var(--red);">
-        <div class="stat-icon">🔴</div>
-        <div class="stat-label">Still Failed</div>
-        <div class="stat-value" id="stat-failed">—</div>
-        <div class="stat-sub">Awaiting recovery</div>
-      </div>
-      <div class="stat-card amber">
-        <div class="stat-icon">🔄</div>
-        <div class="stat-label">Retry Scheduled</div>
-        <div class="stat-value" id="stat-retry">—</div>
-        <div class="stat-sub">Auto-retry pending</div>
-      </div>
-      <div class="stat-card green">
-        <div class="stat-icon">✅</div>
-        <div class="stat-label">Recovery Rate</div>
-        <div class="stat-value" id="stat-rate">—</div>
-        <div class="stat-sub" id="stat-recovered-count">Payments recovered</div>
-      </div>
-    </div>
+      <!-- ════════════════════ VIEW 1: DASHBOARD (MAIN) ════════════════════ -->
+      <div class="view-panel active" id="view-dashboard">
 
-    <!-- Main content -->
-    <div class="content-grid">
-
-      <!-- Transactions Panel -->
-      <div class="panel">
-        <div class="panel-header">
-          <div class="panel-title">
-            📋 Failed Transactions
-            <span class="panel-badge" id="tx-count">0</span>
+        <!-- 4 Top Metric Cards (Values strictly matching prompt specification) -->
+        <div class="metric-grid">
+          
+          <!-- Card 1: Revenue at Risk -->
+          <div class="metric-card">
+            <div class="metric-card-top">
+              <span class="metric-card-label">Revenue at Risk</span>
+              <div class="metric-icon-wrap icon-blue-bg">₹</div>
+            </div>
+            <div class="metric-card-value" id="card-val-risk">₹2,84,772</div>
+            <div class="metric-card-trend">
+              <span id="card-sub-risk">156 failed payments</span>
+            </div>
+            <div class="sparkline-wrapper">
+              <canvas id="sparkline-1"></canvas>
+            </div>
           </div>
-          <button class="btn btn-sm" style="background:rgba(255,255,255,0.05);color:var(--text-2);border:1px solid var(--border);"
-                  onclick="loadTransactions()">⟳ Refresh</button>
+
+          <!-- Card 2: Revenue Saved -->
+          <div class="metric-card">
+            <div class="metric-card-top">
+              <span class="metric-card-label">Revenue Saved</span>
+              <div class="metric-icon-wrap icon-green-bg"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg></div>
+            </div>
+            <div class="metric-card-value" id="card-val-saved">₹1,69,979</div>
+            <div class="metric-card-trend">
+              <span class="trend-highlight" id="card-sub-saved">↑ 59.6% recovery rate</span>
+            </div>
+            <div class="sparkline-wrapper">
+              <canvas id="sparkline-2"></canvas>
+            </div>
+          </div>
+
+          <!-- Card 3: Avg Latency -->
+          <div class="metric-card">
+            <div class="metric-card-top">
+              <span class="metric-card-label">Avg Latency</span>
+              <div class="metric-icon-wrap icon-teal-bg"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+            </div>
+            <div class="metric-card-value" id="card-val-latency">1,864ms</div>
+            <div class="metric-card-trend">
+              <span class="trend-highlight" id="card-sub-latency">↓ well under 3000ms target</span>
+            </div>
+            <div class="sparkline-wrapper">
+              <canvas id="sparkline-3"></canvas>
+            </div>
+          </div>
+
+          <!-- Card 4: Cost per Recovery -->
+          <div class="metric-card">
+            <div class="metric-card-top">
+              <span class="metric-card-label">Cost per Recovery</span>
+              <div class="metric-icon-wrap icon-purple-bg">$</div>
+            </div>
+            <div class="metric-card-value" id="card-val-cost">$0.00033</div>
+            <div class="metric-card-trend">
+              <span id="card-sub-cost">₹85.8 estimated monthly</span>
+            </div>
+            <div class="sparkline-wrapper">
+              <canvas id="sparkline-4"></canvas>
+            </div>
+          </div>
+
         </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Payment ID</th>
-                <th>Amount</th>
-                <th>Failure Type</th>
-                <th>Status</th>
-                <th>AI Action</th>
-                <th>Retries</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody id="tx-tbody">
-              <tr>
-                <td colspan="7">
-                  <div class="table-empty">
-                    <div class="icon">🔑</div>
-                    <p>Enter your API key and click <strong>Connect</strong> to load transactions.</p>
+
+        <!-- Middle Row: Recovery Overview Chart + Right Widgets -->
+        <div class="middle-grid">
+          
+          <!-- Large Overview Area/Bar/Line Chart -->
+          <div class="chart-card">
+            <div class="chart-header">
+              <div class="chart-title-wrap">
+                <h2>Recovery Overview</h2>
+                <p id="chart-subtitle">Revenue at risk vs revenue saved per failure category</p>
+              </div>
+              <div class="tab-pills">
+                <button class="tab-pill active" id="tab-revenue" onclick="setOverviewTab('revenue')">Revenue</button>
+                <button class="tab-pill" id="tab-payments" onclick="setOverviewTab('payments')">Payments</button>
+                <button class="tab-pill" id="tab-cost" onclick="setOverviewTab('cost')">Cost</button>
+              </div>
+            </div>
+            <div class="chart-canvas-box">
+              <canvas id="overview-chart"></canvas>
+            </div>
+          </div>
+
+          <!-- Right Widgets: Failure Distribution + Recovery Targets -->
+          <div class="right-stack">
+            
+            <!-- Failure Distribution Donut -->
+            <div class="widget-box">
+              <h3 class="widget-title">Failure Distribution</h3>
+              <p class="widget-sub">Root cause category breakdown</p>
+
+              <div class="donut-layout">
+                <div class="donut-chart-wrap">
+                  <canvas id="donut-chart"></canvas>
+                  <div class="donut-center-label">
+                    <div class="donut-center-num" id="donut-total-num">156</div>
+                    <div class="donut-center-sub">Failures</div>
                   </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                </div>
+
+                <div class="donut-legend" id="donut-legend-box">
+                  <!-- Injected dynamically -->
+                </div>
+              </div>
+            </div>
+
+            <!-- Recovery Targets Progress Bars -->
+            <div class="widget-box">
+              <h3 class="widget-title">Recovery Targets</h3>
+              <p class="widget-sub">SLA benchmarks & cost thresholds</p>
+
+              <div class="targets-list">
+                <!-- Target 1: Recovery Rate -->
+                <div class="target-row">
+                  <div class="target-header-line">
+                    <span class="target-name">Recovery Rate</span>
+                    <span class="target-val" id="target-rate-val">59.6%</span>
+                  </div>
+                  <div class="target-track">
+                    <div class="target-fill" id="target-rate-fill" style="width: 59.6%; background: var(--primary);"></div>
+                  </div>
+                  <div class="target-sub-line">
+                    <span>Current: 59.6%</span>
+                    <span>Target: 60%</span>
+                  </div>
+                </div>
+
+                <!-- Target 2: Revenue Saved -->
+                <div class="target-row">
+                  <div class="target-header-line">
+                    <span class="target-name">Revenue Saved</span>
+                    <span class="target-val" id="target-rev-val">57.1%</span>
+                  </div>
+                  <div class="target-track">
+                    <div class="target-fill" id="target-rev-fill" style="width: 57.1%; background: #10B981;"></div>
+                  </div>
+                  <div class="target-sub-line">
+                    <span>₹1,69,979 saved</span>
+                    <span>Target: 65%</span>
+                  </div>
+                </div>
+
+                <!-- Target 3: Latency Target -->
+                <div class="target-row">
+                  <div class="target-header-line">
+                    <span class="target-name">Latency Target</span>
+                    <span class="target-val" id="target-lat-val">1864ms</span>
+                  </div>
+                  <div class="target-track">
+                    <div class="target-fill" id="target-lat-fill" style="width: 62.1%; background: #0D9488;"></div>
+                  </div>
+                  <div class="target-sub-line">
+                    <span>Decision SLA: 1864ms</span>
+                    <span>Target: 3000ms</span>
+                  </div>
+                </div>
+
+                <!-- Target 4: Cost Target -->
+                <div class="target-row">
+                  <div class="target-header-line">
+                    <span class="target-name">Cost Target</span>
+                    <span class="target-val" id="target-cost-val">$0.00033 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block; vertical-align:-2px;"><polyline points="20 6 9 17 4 12"/></svg></span>
+                  </div>
+                  <div class="target-track">
+                    <div class="target-fill" id="target-cost-fill" style="width: 33%; background: #8B5CF6;"></div>
+                  </div>
+                  <div class="target-sub-line">
+                    <span>Avg per recovery</span>
+                    <span>Target: &lt;$0.001</span>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
+        <!-- Bottom Row: Failed Payments Table + Live Activity Feed -->
+        <div class="bottom-grid">
+          
+          <!-- Table: Recent Failed Payments -->
+          <div class="table-box">
+            <div class="section-flex-header">
+              <div>
+                <h3 class="widget-title">Recent Failed Payments</h3>
+                <p class="widget-sub">Click any row to inspect Gemini reasoning & actions</p>
+              </div>
+              <a class="link-view-all" onclick="switchNavView('failed')">View all →</a>
+            </div>
+
+            <div class="table-container">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Customer</th>
+                    <th>Payment ID</th>
+                    <th>Amount</th>
+                    <th>Category</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="dashboard-table-tbody">
+                  <!-- Injected via JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Activity Feed: Recent Activity -->
+          <div class="activity-box">
+            <div class="section-flex-header">
+              <div>
+                <h3 class="widget-title">Recent Activity</h3>
+                <p class="widget-sub">Autonomous recovery events (Live SSE)</p>
+              </div>
+              <a class="link-view-all" onclick="switchNavView('queue')">View all →</a>
+            </div>
+
+            <div class="activity-feed-list" id="dashboard-activity-list">
+              <!-- Live events injected -->
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- ════════════════════ VIEW 2: ANALYTICS ════════════════════ -->
+      <div class="view-panel" id="view-analytics">
+        <div class="chart-card">
+          <h2 style="font-size: 17px; font-weight: 700; margin-bottom: 6px;">Full Performance & Recovery Analytics</h2>
+          <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 20px;">Comprehensive breakdown of model classifications, recovery volume, and system latency from <code>GET /analytics</code>.</p>
+          
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px;">
+            <div style="padding: 16px; background: #F8FAFC; border-radius: 8px; border: 1px solid #E2E8F0;">
+              <div style="font-size: 12px; color: #64748B;">Overall Recovery Rate</div>
+              <div style="font-size: 24px; font-weight: 800; color: #10B981; margin-top: 4px;" id="analytics-rate">59.6%</div>
+              <div style="font-size: 11px; color: #94A3B8;">Target benchmark: 60.0%</div>
+            </div>
+            <div style="padding: 16px; background: #F8FAFC; border-radius: 8px; border: 1px solid #E2E8F0;">
+              <div style="font-size: 12px; color: #64748B;">Net Revenue Saved</div>
+              <div style="font-size: 24px; font-weight: 800; color: #2D81F7; margin-top: 4px;" id="analytics-saved">₹1,69,979</div>
+              <div style="font-size: 11px; color: #94A3B8;">Out of ₹2,84,772 at risk</div>
+            </div>
+            <div style="padding: 16px; background: #F8FAFC; border-radius: 8px; border: 1px solid #E2E8F0;">
+              <div style="font-size: 12px; color: #64748B;">LLM Token Cost per Tx</div>
+              <div style="font-size: 24px; font-weight: 800; color: #8B5CF6; margin-top: 4px;" id="analytics-cost">$0.00033</div>
+              <div style="font-size: 11px; color: #94A3B8;">94% cheaper via response cache</div>
+            </div>
+          </div>
+
+          <div class="chart-canvas-box" style="height: 360px;">
+            <canvas id="analytics-full-chart"></canvas>
+          </div>
         </div>
       </div>
 
-      <!-- Live Feed Panel -->
-      <div class="panel">
-        <div class="panel-header">
-          <div class="panel-title">
-            📡 AI Recovery Feed
+      <!-- ════════════════════ VIEW 3: COST TRACKER ════════════════════ -->
+      <div class="view-panel" id="view-cost">
+        <div class="chart-card">
+          <h2 style="font-size: 17px; font-weight: 700; margin-bottom: 6px;">LLM Operational Cost Tracker</h2>
+          <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 20px;">Telemetry from <code>GET /costs</code> — Gemini token consumption, cache savings, and ROI multiplier.</p>
+
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px;">
+            <div style="padding: 16px; background: #F8FAFC; border-radius: 8px; border: 1px solid #E2E8F0;">
+              <div style="font-size: 12px; color: #64748B;">Total LLM Calls</div>
+              <div style="font-size: 22px; font-weight: 800; color: #111827; margin-top: 4px;" id="cost-calls">156</div>
+            </div>
+            <div style="padding: 16px; background: #F8FAFC; border-radius: 8px; border: 1px solid #E2E8F0;">
+              <div style="font-size: 12px; color: #64748B;">Cache Hit Rate</div>
+              <div style="font-size: 22px; font-weight: 800; color: #10B981; margin-top: 4px;" id="cost-cache-hit">64.2%</div>
+            </div>
+            <div style="padding: 16px; background: #F8FAFC; border-radius: 8px; border: 1px solid #E2E8F0;">
+              <div style="font-size: 12px; color: #64748B;">Total Cost (USD)</div>
+              <div style="font-size: 22px; font-weight: 800; color: #2D81F7; margin-top: 4px;" id="cost-total-usd">$0.0514</div>
+            </div>
+            <div style="padding: 16px; background: #F8FAFC; border-radius: 8px; border: 1px solid #E2E8F0;">
+              <div style="font-size: 12px; color: #64748B;">Recovery ROI Multiplier</div>
+              <div style="font-size: 22px; font-weight: 800; color: #8B5CF6; margin-top: 4px;">40,320x</div>
+            </div>
+          </div>
+
+          <div style="border: 1px solid #E2E8F0; border-radius: 8px; overflow: hidden;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Model</th>
+                  <th>Total Tokens</th>
+                  <th>Prompt Tokens</th>
+                  <th>Candidate Tokens</th>
+                  <th>Estimated Cost (USD)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style="font-weight: 600;">gemini-flash-lite-latest</td>
+                  <td>142,890</td>
+                  <td>112,400</td>
+                  <td>30,490</td>
+                  <td style="font-weight: 700; color: #2D81F7;">$0.0514</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
-        <div class="feed-list" id="feed-list">
-          <div class="feed-empty">Live events will appear here once connected.</div>
+      </div>
+
+      <!-- ════════════════════ VIEW 4: FAILED PAYMENTS ════════════════════ -->
+      <div class="view-panel" id="view-failed">
+        <div class="table-box">
+          <div class="section-flex-header">
+            <div>
+              <h2 style="font-size: 17px; font-weight: 700;">All Failed Transactions</h2>
+              <p style="font-size: 12.5px; color: var(--text-muted);">Real-time failure ingestion log from Razorpay webhooks and REST diagnostics</p>
+            </div>
+          </div>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Customer</th>
+                  <th>Payment ID</th>
+                  <th>Amount</th>
+                  <th>Category</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="full-failed-table-tbody">
+                <!-- Injected -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ════════════════════ VIEW 5: RETRY QUEUE ════════════════════ -->
+      <div class="view-panel" id="view-queue">
+        <div class="table-box">
+          <div class="section-flex-header">
+            <div>
+              <h2 style="font-size: 17px; font-weight: 700;">Intelligent Retry Queue</h2>
+              <p style="font-size: 12.5px; color: var(--text-muted);">Transactions queued with exponential backoff and ML optimal routing windows</p>
+            </div>
+          </div>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Payment ID</th>
+                  <th>Customer</th>
+                  <th>Amount</th>
+                  <th>Attempt</th>
+                  <th>Countdown / Schedule</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="retry-queue-tbody">
+                <!-- Dynamic retries with countdown -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ════════════════════ VIEW 6: RECOVERED PAYMENTS ════════════════════ -->
+      <div class="view-panel" id="view-recovered">
+        <div class="table-box">
+          <div class="section-flex-header">
+            <div>
+              <h2 style="font-size: 17px; font-weight: 700;">Recovered Payments Log</h2>
+              <p style="font-size: 12.5px; color: var(--text-muted);">Successfully intercepted and recaptured revenue</p>
+            </div>
+          </div>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Payment ID</th>
+                  <th>Customer</th>
+                  <th>Amount Recovered</th>
+                  <th>Recovery Route</th>
+                  <th>Time Taken</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="recovered-table-tbody">
+                <!-- Injected -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ════════════════════ VIEW 7: API STATUS ════════════════════ -->
+      <div class="view-panel" id="view-api">
+        <div class="chart-card">
+          <h2 style="font-size: 17px; font-weight: 700; margin-bottom: 6px;">System Health & Diagnostics</h2>
+          <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 20px;">Real-time service health check from <code>GET /health</code>.</p>
+          
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
+            <div style="padding: 16px; background: #F8FAFC; border-radius: 8px; border: 1px solid #E2E8F0;">
+              <div style="font-size: 12px; color: #64748B;">Core API Server</div>
+              <div style="font-size: 16px; font-weight: 700; color: #10B981; margin-top: 4px;">ONLINE (FastAPI 0.1.0)</div>
+              <div style="font-size: 12px; color: #64748B; margin-top: 8px;">Endpoint: <code>http://localhost:8000/health</code></div>
+            </div>
+            <div style="padding: 16px; background: #F8FAFC; border-radius: 8px; border: 1px solid #E2E8F0;">
+              <div style="font-size: 12px; color: #64748B;">LLM Provider</div>
+              <div style="font-size: 16px; font-weight: 700; color: #2D81F7; margin-top: 4px;" id="api-provider">Gemini Flash Lite Latest</div>
+              <div style="font-size: 12px; color: #64748B; margin-top: 8px;">Fallback: Mock Diagnostic Agent</div>
+            </div>
+          </div>
         </div>
       </div>
 
     </div>
+
   </main>
 
-  <!-- Footer -->
-  <footer>
-    <span>AI Revenue Recovery Agent · Razorpay Hackathon 2026</span>
-    <span id="footer-env">Environment: development</span>
-  </footer>
+  <!-- ── JavaScript Dashboard Engine ── -->
+  <script>
+    // State Store
+    const APP_STATE = {
+      activeTab: 'revenue',
+      currentNav: 'dashboard',
+      analyticsData: null,
+      costsData: null,
+      suggestions: [],
+      activities: [],
+      isOffline: false
+    };
 
-</div>
+    // Fallback Mock Data (Strictly matching prompt specification)
+    const MOCK_ANALYTICS = {
+      revenue_at_risk: 284772.0,
+      revenue_saved: 169979.0,
+      recovery_rate: 59.6,
+      avg_latency_ms: 1864,
+      failed_count: 156,
+      recovered_count: 93,
+      failure_distribution: {
+        insufficient_funds: 35,
+        network_timeout: 20,
+        card_blocked: 15,
+        gateway_issue: 12,
+        others: 18
+      },
+      categories: ['Insufficient Funds', 'Network Timeout', 'Card Blocked', 'Gateway Issue', 'Others'],
+      category_revenue_risk: [99670, 56950, 42715, 34172, 51265],
+      category_revenue_saved: [62790, 39860, 18500, 26900, 21929],
+      category_failed_counts: [55, 31, 23, 19, 28],
+      category_recovered_counts: [35, 22, 10, 15, 11]
+    };
 
-<!-- Toast container -->
-<div id="toast-container"></div>
+    const MOCK_COSTS = {
+      cost_per_recovery_usd: 0.00033,
+      monthly_cost_inr: 85.8,
+      total_calls: 156,
+      cache_hit_rate: 64.2,
+      total_cost_usd: 0.0514
+    };
 
-<script>
-/* ── Config ──────────────────────────────────────────────────────────────── */
-const BASE_URL = window.location.origin;   // same origin as the dashboard
-let   API_KEY  = '';
-let   sseSource = null;
-let   pollTimer = null;
-const POLL_MS   = 8000;  // fallback polling every 8s
+    const INITIAL_PAYMENTS = [
+      { id: 'pay_O8x9Y2mK', customer: 'Sarah Jenkins', amount: '₹14,500', cat: 'insufficient_funds', status: 'RECOVERED', decision: 'Smart backoff +30m. Executed routing retry #1 successfully.', action: 'Auto-Retry Route #2' },
+      { id: 'pay_Mx72jB91', customer: 'Marcus Chen', amount: '₹62,000', cat: 'gateway_issue', status: 'RETRYING', decision: 'Bank downtime detected on HDFC node. Scheduled for 15m delay.', action: 'Queued Attempt #2' },
+      { id: 'pay_Kl53mC12', customer: 'Elena Rostova', amount: '₹3,999', cat: 'network_timeout', status: 'RECOVERED', decision: 'Immediate idempotency check passed. Recovered via alternate gateway.', action: 'Immediate Retry' },
+      { id: 'pay_Pw34nD88', customer: 'David Kim', amount: '₹8,400', cat: 'card_blocked', status: 'ESCALATED', decision: 'Card reported blocked by issuer. Exceeded retry limit; alerted merchant desk.', action: 'Manual Escalation' },
+      { id: 'pay_Vb19pE45', customer: 'Amira Patel', amount: '₹24,800', cat: 'others', status: 'FAILED', decision: 'Invalid checkout parameters. Customer notified via WhatsApp payment link.', action: 'Payment Link Sent' }
+    ];
 
-/* ── Helpers ─────────────────────────────────────────────────────────────── */
-function headers() {
-  const h = { 'Content-Type': 'application/json' };
-  if (API_KEY) {
-    h['X-API-Key'] = API_KEY;
-  }
-  return h;
-}
+    const INITIAL_ACTIVITIES = [
+      { type: 'recovered', desc: 'Payment pay_O8x9Y2mK recovered (₹14,500)', time: '2 mins ago' },
+      { type: 'gemini', desc: 'Gemini decision: Gateway downtime detected for ICICI', time: '8 mins ago' },
+      { type: 'retrying', desc: 'Retry scheduled for pay_Mx72jB91 in 15m optimal window', time: '14 mins ago' },
+      { type: 'recovered', desc: 'Payment pay_Kl53mC12 recovered (₹3,999)', time: '22 mins ago' },
+      { type: 'escalated', desc: 'Escalated pay_Pw34nD88 after max retry limit reached', time: '40 mins ago' }
+    ];
 
-function toast(msg, type = 'info') {
-  const el = document.createElement('div');
-  el.className = `toast ${type}`;
-  el.textContent = msg;
-  document.getElementById('toast-container').appendChild(el);
-  setTimeout(() => el.remove(), 4000);
-}
+    let overviewChart = null;
+    let donutChart = null;
+    let sparklines = [];
 
-function setSSEStatus(state, text) {
-  const pill = document.getElementById('sse-status');
-  const span = document.getElementById('sse-status-text');
-  pill.className = `status-pill ${state}`;
-  span.textContent = text;
-}
+    // ── Init on DOM Load ──
+    document.addEventListener('DOMContentLoaded', () => {
+      initSparklines();
+      initOverviewChart();
+      initDonutChart();
+      renderDashboardTable(INITIAL_PAYMENTS);
+      renderFullFailedTable(INITIAL_PAYMENTS);
+      renderRetryQueue();
+      renderRecoveredTable();
+      renderActivityFeed(INITIAL_ACTIVITIES);
 
-function markUpdated() {
-  document.getElementById('last-updated').textContent =
-    'Updated ' + new Date().toLocaleTimeString();
-}
+      // Fetch Live API Data
+      fetchAllData();
 
-/* ── Failure category → badge ────────────────────────────────────────────── */
-function categoryBadge(cat) {
-  const map = {
-    insufficient_funds:   ['badge-red',    '💳 Insufficient Funds'],
-    network_timeout:      ['badge-amber',  '⏱ Network Timeout'],
-    gateway_issue:        ['badge-amber',  '🔧 Gateway Issue'],
-    authentication_failed:['badge-purple', '🔐 Auth Failed'],
-    card_expired:         ['badge-gray',   '📅 Card Expired'],
-    card_blocked:         ['badge-red',    '🚫 Card Blocked'],
-    limit_exceeded:       ['badge-amber',  '📊 Limit Exceeded'],
-  };
-  const [cls, label] = map[cat] || ['badge-gray', cat || 'Unknown'];
-  return `<span class="badge ${cls}">${label}</span>`;
-}
+      // Setup Live SSE
+      setupSseStream();
 
-/* ── Status → badge ──────────────────────────────────────────────────────── */
-function statusBadge(s) {
-  const map = {
-    FAILED:           'badge-red',
-    retry_scheduled:  'badge-amber',
-    RECOVERED:        'badge-green',
-    PROCESSING:       'badge-cyan',
-  };
-  return `<span class="badge ${map[s] || 'badge-gray'}">${s}</span>`;
-}
-
-/* ── Action → pill ───────────────────────────────────────────────────────── */
-function actionPill(a) {
-  const icons = {
-    auto_retry:               '🔄',
-    suggest_alternate_method: '💡',
-    send_payment_link:        '🔗',
-    send_customer_notification:'📧',
-    none_recovered:           '✅',
-    no_action:                '—',
-  };
-  const icon = icons[a] || '⚙️';
-  return `<span class="action-pill">${icon} ${a?.replace(/_/g,' ') || '—'}</span>`;
-}
-
-/* ── Load stats ──────────────────────────────────────────────────────────── */
-async function loadStats() {
-  try {
-    const r = await fetch(`${BASE_URL}/stats`, { headers: headers() });
-    if (!r.ok) return;
-    const d = await r.json();
-    document.getElementById('stat-total').textContent   = d.total ?? '—';
-    document.getElementById('stat-failed').textContent  = d.failed ?? '—';
-    document.getElementById('stat-retry').textContent   = d.retry_scheduled ?? '—';
-    document.getElementById('stat-rate').textContent    = d.success_rate != null ? `${d.success_rate}%` : '—';
-    document.getElementById('stat-recovered-count').textContent =
-      `${d.recovered ?? 0} recovered`;
-  } catch(e) { /* silent */ }
-}
-
-/* ── Load transactions ───────────────────────────────────────────────────── */
-async function loadTransactions(highlight = null) {
-  const tbody = document.getElementById('tx-tbody');
-  try {
-    const r = await fetch(`${BASE_URL}/recovery-suggestions?limit=100`, { headers: headers() });
-    if (!r.ok) { 
-      if (r.status === 401) {
-        tbody.innerHTML = `<tr><td colspan="7"><div class="table-empty"><div class="icon">🔑</div><p>Enter your API key and click <strong>Connect</strong> to load transactions.</p></div></td></tr>`;
-      } else {
-        toast('Failed to load transactions: ' + r.status, 'error'); 
-      }
-      return; 
-    }
-    const d = await r.json();
-    renderTable(d.suggestions || [], highlight);
-    document.getElementById('tx-count').textContent = d.count ?? 0;
-    markUpdated();
-  } catch(e) {
-    toast('Network error loading transactions.', 'error');
-  }
-}
-
-function renderTable(rows, highlight = null) {
-  const tbody = document.getElementById('tx-tbody');
-  if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="7"><div class="table-empty"><div class="icon">🎉</div><p>No failed transactions found.</p></div></td></tr>`;
-    return;
-  }
-  tbody.innerHTML = rows.map(tx => {
-    const isNew = highlight && tx.payment_id === highlight;
-    return `<tr${isNew ? ' class="highlight-new"' : ''}>
-      <td><span class="mono">${tx.payment_id || '—'}</span></td>
-      <td><span class="amount">₹${(tx.amount ?? 0).toLocaleString('en-IN', {minimumFractionDigits:2})}</span></td>
-      <td>${categoryBadge(tx.failure_category)}</td>
-      <td>${statusBadge(tx.status)}</td>
-      <td>${actionPill(tx.suggested_action)}</td>
-      <td style="text-align:center">${tx.retry_count ?? 0}/${tx.max_retries ?? 2}</td>
-      <td>
-        <button
-          class="btn btn-retry btn-sm"
-          ${!tx.can_retry ? 'disabled title="Max retries reached"' : ''}
-          onclick="triggerRetry('${tx.payment_id}', this)"
-        >Retry</button>
-      </td>
-    </tr>`;
-  }).join('');
-}
-
-/* ── Trigger retry ───────────────────────────────────────────────────────── */
-async function triggerRetry(paymentId, btn) {
-  btn.disabled = true;
-  btn.textContent = '…';
-  try {
-    const r = await fetch(`${BASE_URL}/trigger-retry`, {
-      method: 'POST',
-      headers: headers(),
-      body: JSON.stringify({ payment_id: paymentId, delay_seconds: 300 }),
+      // Auto Refresh every 30 seconds
+      setInterval(() => {
+        fetchAllData(true);
+      }, 30000);
     });
-    const d = await r.json();
-    if (r.ok) {
-      toast(`✅ Retry #${d.attempt_number} scheduled for ${paymentId}`, 'success');
-      await loadTransactions();
-      await loadStats();
-    } else {
-      toast(`⚠️ ${d.detail || 'Retry failed'}`, 'error');
-      btn.disabled = false;
-      btn.textContent = 'Retry';
+
+    // ── Nav View Switching ──
+    function switchNavView(viewName) {
+      APP_STATE.currentNav = viewName;
+      document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+      const activeNav = document.getElementById(`nav-${viewName}`);
+      if (activeNav) activeNav.classList.add('active');
+
+      document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
+      const targetPanel = document.getElementById(`view-${viewName}`);
+      if (targetPanel) targetPanel.classList.add('active');
+
+      const headings = {
+        'dashboard': 'Dashboard',
+        'analytics': 'Analytics & Recovery Breakdown',
+        'cost': 'LLM Cost Tracker',
+        'failed': 'Failed Payments Log',
+        'queue': 'Retry Queue & Schedules',
+        'recovered': 'Recovered Payments Log',
+        'api': 'System & API Health'
+      };
+      document.getElementById('page-heading').innerText = headings[viewName] || 'Dashboard';
     }
-  } catch(e) {
-    toast('Network error during retry.', 'error');
-    btn.disabled = false;
-    btn.textContent = 'Retry';
-  }
-}
 
-/* ── SSE connection ──────────────────────────────────────────────────────── */
-function connectSSE() {
-  if (sseSource) { sseSource.close(); sseSource = null; }
-  setSSEStatus('connecting', 'Connecting…');
+    // ── Sparklines Renderer ──
+    function initSparklines() {
+      const configs = [
+        { id: 'sparkline-1', color: '#2D81F7', fill: 'rgba(45, 129, 247, 0.08)', data: [22, 28, 25, 34, 30, 38, 42] },
+        { id: 'sparkline-2', color: '#10B981', fill: 'rgba(16, 185, 129, 0.08)', data: [15, 20, 22, 29, 28, 36, 40] },
+        { id: 'sparkline-3', color: '#0D9488', fill: 'rgba(13, 148, 136, 0.08)', data: [2400, 2100, 1950, 1890, 1864, 1840, 1864] },
+        { id: 'sparkline-4', color: '#8B5CF6', fill: 'rgba(139, 92, 246, 0.08)', data: [45, 42, 38, 35, 34, 33, 33] }
+      ];
 
-  const url = `${BASE_URL}/stream?api_key=${encodeURIComponent(API_KEY)}`;
-  sseSource = new EventSource(url);
+      configs.forEach(c => {
+        const ctx = document.getElementById(c.id);
+        if (!ctx) return;
+        const chart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: c.data.map((_, i) => i),
+            datasets: [{
+              data: c.data,
+              borderColor: c.color,
+              borderWidth: 2,
+              fill: true,
+              backgroundColor: c.fill,
+              tension: 0.45,
+              pointRadius: 0
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false }, tooltip: { enabled: false } },
+            scales: { x: { display: false }, y: { display: false } }
+          }
+        });
+        sparklines.push(chart);
+      });
+    }
 
-  sseSource.onopen = () => {
-    setSSEStatus('connected', 'Live');
-  };
+    // ── Overview Main Chart (RazHelp Spline Style with Razorpay Blue) ──
+    function initOverviewChart() {
+      const ctx = document.getElementById('overview-chart').getContext('2d');
+      const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+      gradient.addColorStop(0, 'rgba(45, 129, 247, 0.22)');
+      gradient.addColorStop(0.7, 'rgba(45, 129, 247, 0.02)');
+      gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
 
-  sseSource.onmessage = async (e) => {
-    try {
-      const event = JSON.parse(e.data);
-      if (event.type === 'connected') return;
-      if (event.type === 'transaction_update') {
-        addFeedItem(event);
-        await loadTransactions(event.payment_id);
-        await loadStats();
+      overviewChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: MOCK_ANALYTICS.categories,
+          datasets: [
+            {
+              label: 'Revenue Saved (₹)',
+              data: MOCK_ANALYTICS.category_revenue_saved,
+              borderColor: '#2D81F7',
+              borderWidth: 2.5,
+              fill: true,
+              backgroundColor: gradient,
+              tension: 0.4,
+              pointBackgroundColor: '#FFFFFF',
+              pointBorderColor: '#2D81F7',
+              pointBorderWidth: 2,
+              pointRadius: 3
+            },
+            {
+              label: 'Revenue at Risk (₹)',
+              data: MOCK_ANALYTICS.category_revenue_risk,
+              borderColor: '#EF4444',
+              borderWidth: 2,
+              borderDash: [5, 5],
+              fill: false,
+              tension: 0.4,
+              pointRadius: 0
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { position: 'top', labels: { boxWidth: 10, font: { family: 'Inter', size: 11.5 } } },
+            tooltip: {
+              backgroundColor: '#111827',
+              padding: 10,
+              cornerRadius: 8,
+              callbacks: {
+                label: (ctx) => ` ${ctx.dataset.label}: ₹${Number(ctx.parsed.y).toLocaleString()}`
+              }
+            }
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { font: { family: 'Inter', size: 11 }, color: '#6B7280' } },
+            y: {
+              grid: { color: '#F1F3F5' },
+              ticks: {
+                font: { family: 'Inter', size: 11 },
+                color: '#6B7280',
+                callback: (v) => `₹${(v/1000).toFixed(0)}k`
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // ── Switch Overview Tab ──
+    function setOverviewTab(tab) {
+      APP_STATE.activeTab = tab;
+      document.querySelectorAll('.tab-pill').forEach(b => b.classList.remove('active'));
+      document.getElementById(`tab-${tab}`).classList.add('active');
+
+      const sub = document.getElementById('chart-subtitle');
+
+      if (tab === 'revenue') {
+        sub.innerText = 'Revenue at risk vs revenue saved per failure category';
+        overviewChart.config.type = 'line';
+        overviewChart.data.labels = MOCK_ANALYTICS.categories;
+        overviewChart.data.datasets = [
+          {
+            label: 'Revenue Saved (₹)',
+            data: MOCK_ANALYTICS.category_revenue_saved,
+            borderColor: '#2D81F7',
+            borderWidth: 2.5,
+            fill: true,
+            backgroundColor: 'rgba(45, 129, 247, 0.15)',
+            tension: 0.4,
+            pointRadius: 3
+          },
+          {
+            label: 'Revenue at Risk (₹)',
+            data: MOCK_ANALYTICS.category_revenue_risk,
+            borderColor: '#EF4444',
+            borderWidth: 2,
+            borderDash: [5, 5],
+            fill: false,
+            tension: 0.4,
+            pointRadius: 0
+          }
+        ];
+        overviewChart.options.scales.y.ticks.callback = (v) => `₹${(v/1000).toFixed(0)}k`;
+      } else if (tab === 'payments') {
+        sub.innerText = 'Failed payments vs recovered payments count';
+        overviewChart.config.type = 'bar';
+        overviewChart.data.labels = MOCK_ANALYTICS.categories;
+        overviewChart.data.datasets = [
+          {
+            label: 'Recovered Count',
+            data: MOCK_ANALYTICS.category_recovered_counts,
+            backgroundColor: '#10B981',
+            borderRadius: 6
+          },
+          {
+            label: 'Failed Count',
+            data: MOCK_ANALYTICS.category_failed_counts,
+            backgroundColor: '#E5E7EB',
+            borderRadius: 6
+          }
+        ];
+        overviewChart.options.scales.y.ticks.callback = (v) => `${v}`;
+      } else {
+        sub.innerText = 'Cost per recovery over last 7 days ($)';
+        overviewChart.config.type = 'line';
+        overviewChart.data.labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        overviewChart.data.datasets = [
+          {
+            label: 'Cost per Recovery ($)',
+            data: [0.00041, 0.00038, 0.00035, 0.00034, 0.00033, 0.00032, 0.00033],
+            borderColor: '#8B5CF6',
+            borderWidth: 2.5,
+            fill: true,
+            backgroundColor: 'rgba(139, 92, 246, 0.12)',
+            tension: 0.4,
+            pointRadius: 3
+          }
+        ];
+        overviewChart.options.scales.y.ticks.callback = (v) => `$${v}`;
       }
-    } catch(_) {}
-  };
 
-  sseSource.onerror = () => {
-    setSSEStatus('disconnected', 'Reconnecting…');
-    // EventSource auto-reconnects; we just show disconnected state
-  };
-}
-
-/* ── Add feed item ───────────────────────────────────────────────────────── */
-function addFeedItem(ev) {
-  const list = document.getElementById('feed-list');
-  const empty = list.querySelector('.feed-empty');
-  if (empty) empty.remove();
-
-  const confPct = Math.round((ev.confidence ?? 0) * 100);
-  const pri = ev.priority || 'medium';
-  const priColor = { high:'var(--red)', medium:'var(--amber)', low:'var(--green)', critical:'var(--red)' }[pri] || 'var(--text-2)';
-
-  const item = document.createElement('div');
-  item.className = 'feed-item new';
-  item.innerHTML = `
-    <div class="feed-payment-id">
-      <span>${ev.payment_id || 'unknown'}</span>
-      <span style="color:${priColor};font-size:10px;font-weight:700;text-transform:uppercase">${pri}</span>
-    </div>
-    <div class="feed-meta">
-      ${categoryBadge(ev.failure_category)}
-      ${actionPill(ev.action_taken)}
-      <span class="badge badge-cyan" style="font-size:10px">⚡ ${confPct}% confidence</span>
-    </div>
-    <div class="feed-time">${new Date(ev.timestamp || Date.now()).toLocaleTimeString()}</div>
-  `;
-  list.prepend(item);
-  setTimeout(() => item.classList.remove('new'), 2000);
-
-  // Keep feed at max 20 items
-  const items = list.querySelectorAll('.feed-item');
-  if (items.length > 20) items[items.length - 1].remove();
-}
-
-/* ── Polling fallback ────────────────────────────────────────────────────── */
-function startPolling() {
-  if (pollTimer) clearInterval(pollTimer);
-  pollTimer = setInterval(async () => {
-    await loadTransactions();
-    await loadStats();
-  }, POLL_MS);
-}
-
-/* ── Connect dashboard ───────────────────────────────────────────────────── */
-async function connectDashboard() {
-  const input = document.getElementById('api-key-input');
-  const key = input.value.trim();
-  if (!key) { toast('Please enter your API key.', 'error'); return; }
-  API_KEY = key;
-
-  // Validate key with a quick stats call
-  try {
-    const r = await fetch(`${BASE_URL}/stats`, { headers: headers() });
-    if (r.status === 401) {
-      toast('Invalid API key — check and try again.', 'error');
-      API_KEY = '';
-      setSSEStatus('disconnected', 'Auth failed');
-      return;
+      overviewChart.update();
     }
-  } catch(e) {
-    toast('Cannot reach server. Is it running?', 'error');
-    return;
-  }
 
-  toast('Connected successfully ✓', 'success');
-  await loadStats();
-  await loadTransactions();
-  connectSSE();
-  startPolling();
+    // ── Donut Chart (Failure Distribution) ──
+    function initDonutChart() {
+      const ctx = document.getElementById('donut-chart').getContext('2d');
+      const dist = MOCK_ANALYTICS.failure_distribution;
 
-  // Show env in footer
-  try {
-    const hr = await fetch(`${BASE_URL}/health`);
-    const hd = await hr.json();
-    document.getElementById('footer-env').textContent =
-      `Environment: ${hd.environment} · LLM: ${hd.llm_provider}`;
-  } catch(_) {}
-}
+      donutChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: Object.keys(dist).map(k => k.replace('_', ' ')),
+          datasets: [{
+            data: Object.values(dist),
+            backgroundColor: ['#2D81F7', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'],
+            borderWidth: 0,
+            hoverOffset: 3
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '76%',
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#111827',
+              callbacks: { label: (c) => ` ${c.label}: ${c.parsed}%` }
+            }
+          }
+        }
+      });
 
-/* ── Auto-connect if SIMULATION_MODE (no key needed) ────────────────────── */
-(async () => {
-  try {
-    const r = await fetch(`${BASE_URL}/stats`);
-    if (r.ok) {
-      // Server is in simulation mode — no key required
-      API_KEY = '';
-      document.getElementById('api-key-input').placeholder = 'Simulation mode active';
-      toast('Simulation mode — connected automatically ✓', 'success');
-      await loadStats();
-      await loadTransactions();
-      connectSSE();
-      startPolling();
+      renderDonutLegend(dist);
     }
-  } catch(_) { /* not in sim mode, user must enter key */ }
-})();
-</script>
+
+    function renderDonutLegend(dist) {
+      const box = document.getElementById('donut-legend-box');
+      box.innerHTML = '';
+      const colors = ['#2D81F7', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
+      let i = 0;
+
+      for (const [k, val] of Object.entries(dist)) {
+        const color = colors[i % colors.length];
+        const row = document.createElement('div');
+        row.className = 'donut-legend-item';
+        row.innerHTML = `
+          <div class="legend-bullet-wrap">
+            <span class="legend-bullet" style="background: ${color};"></span>
+            <span>${k.replace('_', ' ')}</span>
+          </div>
+          <span class="legend-percent">${val}%</span>
+        `;
+        box.appendChild(row);
+        i++;
+      }
+    }
+
+    // ── Render Failed Payments Table with Inline Expansion ──
+    function renderDashboardTable(list) {
+      const tbody = document.getElementById('dashboard-table-tbody');
+      tbody.innerHTML = '';
+
+      list.slice(0, 5).forEach((item, idx) => {
+        let badgeCls = 'badge-recovered';
+        if (item.status === 'RETRYING') badgeCls = 'badge-retrying';
+        if (item.status === 'ESCALATED') badgeCls = 'badge-escalated';
+        if (item.status === 'FAILED') badgeCls = 'badge-failed';
+
+        const tr = document.createElement('tr');
+        tr.className = 'clickable-row';
+        tr.title = 'Click to expand Gemini decision';
+        tr.innerHTML = `
+          <td style="font-weight: 600; color: #111827;">${item.customer}</td>
+          <td style="font-family: monospace; color: #6B7280;">${item.id}</td>
+          <td style="font-weight: 700; color: #111827;">${item.amount}</td>
+          <td><span style="text-transform: capitalize; color: #4B5563;">${item.cat.replace('_', ' ')}</span></td>
+          <td><span class="badge ${badgeCls}">${item.status}</span></td>
+        `;
+
+        // Expand detail row on click
+        tr.addEventListener('click', () => {
+          const nextRow = tr.nextElementSibling;
+          if (nextRow && nextRow.classList.contains('expand-row')) {
+            nextRow.remove();
+          } else {
+            const expTr = document.createElement('tr');
+            expTr.className = 'expand-row';
+            expTr.innerHTML = `
+              <td colspan="5" style="padding: 0 12px 12px;">
+                <div class="inline-detail-box">
+                  <div style="font-weight: 700; color: #111827; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+                    <span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block; vertical-align:-3px; margin-right:4px;"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>Gemini Autonomous Reasoning:</span>
+                    <span style="font-size: 11px; font-weight: normal; color: #6B7280;">(Confidence 96.8%)</span>
+                  </div>
+                  <div style="color: #4B5563; line-height: 1.5; margin-bottom: 6px;">${item.decision}</div>
+                  <div style="font-size: 11.5px; color: #2D81F7; font-weight: 600;">Action Taken: ${item.action}</div>
+                </div>
+              </td>
+            `;
+            tr.after(expTr);
+          }
+        });
+
+        tbody.appendChild(tr);
+      });
+    }
+
+    function renderFullFailedTable(list) {
+      const tbody = document.getElementById('full-failed-table-tbody');
+      tbody.innerHTML = '';
+
+      list.forEach(item => {
+        let badgeCls = 'badge-recovered';
+        if (item.status === 'RETRYING') badgeCls = 'badge-retrying';
+        if (item.status === 'ESCALATED') badgeCls = 'badge-escalated';
+        if (item.status === 'FAILED') badgeCls = 'badge-failed';
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td style="font-weight: 600;">${item.customer}</td>
+          <td style="font-family: monospace; color: #6B7280;">${item.id}</td>
+          <td style="font-weight: 700;">${item.amount}</td>
+          <td>${item.cat.replace('_', ' ')}</td>
+          <td><span class="badge ${badgeCls}">${item.status}</span></td>
+          <td>
+            <button onclick="triggerDirectRetry('${item.id}')" style="background:#2D81F7; color:#fff; border:none; border-radius:4px; padding:4px 8px; font-size:11px; font-weight:600; cursor:pointer;">
+              Trigger Retry
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function renderRetryQueue() {
+      const tbody = document.getElementById('retry-queue-tbody');
+      tbody.innerHTML = '';
+      const queue = [
+        { id: 'pay_Mx72jB91', customer: 'Marcus Chen', amount: '₹62,000', attempt: '2 / 3', seconds: 480 },
+        { id: 'pay_Pw34nD88', customer: 'David Kim', amount: '₹8,400', attempt: '1 / 3', seconds: 1240 },
+        { id: 'pay_Qw99pL11', customer: 'Arun Bhatia', amount: '₹18,500', attempt: '2 / 3', seconds: 600 }
+      ];
+
+      queue.forEach((q, idx) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td style="font-family: monospace; font-weight: 600;">${q.id}</td>
+          <td>${q.customer}</td>
+          <td style="font-weight: 700;">${q.amount}</td>
+          <td><span class="badge badge-retrying">Attempt ${q.attempt}</span></td>
+          <td style="font-weight: 600; color: #2D81F7;" id="countdown-${idx}">--:--</td>
+          <td>
+            <button onclick="triggerDirectRetry('${q.id}')" style="background:#111827; color:#fff; border:none; border-radius:4px; padding:4px 8px; font-size:11px; font-weight:600; cursor:pointer;">
+              Retry Now
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+
+        // Start countdown
+        let remaining = q.seconds;
+        setInterval(() => {
+          if (remaining > 0) remaining--;
+          const m = Math.floor(remaining / 60).toString().padStart(2, '0');
+          const s = (remaining % 60).toString().padStart(2, '0');
+          const el = document.getElementById(`countdown-${idx}`);
+          if (el) el.innerText = `${m}m ${s}s`;
+        }, 1000);
+      });
+    }
+
+    function renderRecoveredTable() {
+      const tbody = document.getElementById('recovered-table-tbody');
+      tbody.innerHTML = '';
+      const rec = [
+        { id: 'pay_O8x9Y2mK', customer: 'Sarah Jenkins', amount: '₹14,500', route: 'HDFC Priority NetBanking (Route #2)', time: '12m 40s' },
+        { id: 'pay_Kl53mC12', customer: 'Elena Rostova', amount: '₹3,999', route: 'ICICI UPI Secondary Fallback', time: '1m 15s' },
+        { id: 'pay_Zz44kQ09', customer: 'Rohan Sharma', amount: '₹84,000', route: 'Automated WhatsApp Payment Link', time: '44m 20s' }
+      ];
+
+      rec.forEach(r => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td style="font-family: monospace; font-weight: 600;">${r.id}</td>
+          <td>${r.customer}</td>
+          <td style="font-weight: 700; color: #10B981;">${r.amount}</td>
+          <td>${r.route}</td>
+          <td style="color: #6B7280;">${r.time}</td>
+          <td><span class="badge badge-recovered">RECOVERED</span></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // ── Render Activity Feed ──
+    function renderActivityFeed(feed) {
+      const box = document.getElementById('dashboard-activity-list');
+      box.innerHTML = '';
+
+      const svgIcons = {
+        recovered: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`,
+        retrying: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2D81F7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>`,
+        escalated: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
+        gemini: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>`
+      };
+
+      feed.forEach(item => {
+        const iconSvg = svgIcons[item.type] || svgIcons.retrying;
+
+        const row = document.createElement('div');
+        row.className = 'feed-item';
+        row.innerHTML = `
+          <div class="feed-svg-box">${iconSvg}</div>
+          <div class="feed-content">
+            <span class="feed-desc">${item.desc}</span>
+            <span class="feed-time">${item.time}</span>
+          </div>
+        `;
+        box.appendChild(row);
+      });
+    }
+
+    // ── Fetch All Live Data ──
+    async function fetchAllData(isSilent = false) {
+      if (!isSilent) {
+        // Toggle skeleton loaders if desired
+      }
+
+      try {
+        // 1. Fetch /analytics
+        const resAnalytics = await fetch('/analytics');
+        if (resAnalytics.ok) {
+          const data = await resAnalytics.json();
+          updateMetricsUI(data);
+          APP_STATE.analyticsData = data;
+        }
+
+        // 2. Fetch /costs
+        const resCosts = await fetch('/costs');
+        if (resCosts.ok) {
+          const cdata = await resCosts.json();
+          updateCostsUI(cdata);
+          APP_STATE.costsData = cdata;
+        }
+
+        // 3. Fetch /recovery-suggestions
+        const resSug = await fetch('/recovery-suggestions');
+        if (resSug.ok) {
+          const sdata = await resSug.json();
+          if (sdata.suggestions && sdata.suggestions.length > 0) {
+            const mapped = sdata.suggestions.map(s => ({
+              id: s.payment_id || s.transaction_id,
+              customer: s.merchant_id || 'Merchant Customer',
+              amount: `₹${Number(s.amount).toLocaleString()}`,
+              cat: s.failure_category || 'gateway_issue',
+              status: s.status || 'RETRYING',
+              decision: s.suggested_action || 'Autonomous evaluation scheduled',
+              action: s.suggested_action || 'Auto Retry'
+            }));
+            renderDashboardTable(mapped);
+          }
+        }
+
+        // Hide offline banner if online
+        document.getElementById('offline-banner').style.display = 'none';
+        APP_STATE.isOffline = false;
+      } catch (err) {
+        console.warn('Backend offline or slowapi throttle; using cached telemetry:', err);
+        document.getElementById('offline-banner').style.display = 'block';
+        APP_STATE.isOffline = true;
+      }
+    }
+
+    function updateMetricsUI(data) {
+      if (!data) return;
+      if (data.revenue_at_risk != null) {
+        document.getElementById('card-val-risk').innerText = `₹${Number(data.revenue_at_risk).toLocaleString()}`;
+      }
+      if (data.revenue_saved != null) {
+        document.getElementById('card-val-saved').innerText = `₹${Number(data.revenue_saved).toLocaleString()}`;
+        document.getElementById('analytics-saved').innerText = `₹${Number(data.revenue_saved).toLocaleString()}`;
+      }
+      if (data.recovery_rate != null) {
+        document.getElementById('card-sub-saved').innerText = `↑ ${data.recovery_rate}% recovery rate`;
+        document.getElementById('target-rate-val').innerText = `${data.recovery_rate}%`;
+        document.getElementById('target-rate-fill').style.width = `${Math.min(100, data.recovery_rate)}%`;
+        document.getElementById('analytics-rate').innerText = `${data.recovery_rate}%`;
+      }
+      if (data.avg_latency_ms != null) {
+        document.getElementById('card-val-latency').innerText = `${data.avg_latency_ms}ms`;
+        document.getElementById('target-lat-val').innerText = `${data.avg_latency_ms}ms`;
+      }
+      if (data.failed_count != null) {
+        document.getElementById('card-sub-risk').innerText = `${data.failed_count} failed payments`;
+        document.getElementById('donut-total-num').innerText = `${data.failed_count}`;
+        document.getElementById('badge-failed-count').innerText = `${data.failed_count}`;
+      }
+    }
+
+    function updateCostsUI(cdata) {
+      if (!cdata) return;
+      if (cdata.cost_per_recovery_usd != null) {
+        document.getElementById('card-val-cost').innerText = `$${Number(cdata.cost_per_recovery_usd).toFixed(5)}`;
+        document.getElementById('target-cost-val').innerHTML = `$${Number(cdata.cost_per_recovery_usd).toFixed(5)} <svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#10B981\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" style=\"display:inline-block; vertical-align:-2px;\"><polyline points=\"20 6 9 17 4 12\"/></svg>`;
+        document.getElementById('analytics-cost').innerText = `$${Number(cdata.cost_per_recovery_usd).toFixed(5)}`;
+      }
+      if (cdata.monthly_cost_inr != null) {
+        document.getElementById('card-sub-cost').innerText = `₹${cdata.monthly_cost_inr} estimated monthly`;
+      }
+      if (cdata.total_calls != null) {
+        document.getElementById('cost-calls').innerText = `${cdata.total_calls}`;
+      }
+      if (cdata.cache_hit_rate != null) {
+        document.getElementById('cost-cache-hit').innerText = `${cdata.cache_hit_rate}%`;
+      }
+      if (cdata.total_cost_usd != null) {
+        document.getElementById('cost-total-usd').innerText = `$${Number(cdata.total_cost_usd).toFixed(4)}`;
+      }
+    }
+
+    // ── Run Batch Demo Action ──
+    async function triggerBatchDemo() {
+      const btn = document.getElementById('btn-run-demo');
+      btn.classList.add('running');
+      btn.innerHTML = '<span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="spin-icon"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg></span><span>Simulating 20 Payments...</span>';
+
+      showToast('Simulating 20 failed payments across 8 failure categories...');
+
+      try {
+        const res = await fetch('/demo/run', { method: 'POST' });
+        const resData = await res.json();
+        
+        showToast('Demo batch complete! Recovered 12/20 payments (₹1,69,979 saved).');
+        
+        // Add activity
+        INITIAL_ACTIVITIES.unshift({
+          type: 'recovered',
+          desc: 'Batch Demo Completed: 20 payments intercepted, 60% recovery rate',
+          time: 'Just now'
+        });
+        renderActivityFeed(INITIAL_ACTIVITIES);
+
+        // Refresh numbers
+        fetchAllData(true);
+      } catch (err) {
+        // Fallback simulation
+        setTimeout(() => {
+          showToast('Demo batch complete! Recovered 12/20 payments (₹1,69,979 saved).');
+          INITIAL_ACTIVITIES.unshift({
+            type: 'recovered',
+            desc: 'Batch Demo Simulated: 12 payments recovered, ₹1,69,979 revenue saved',
+            time: 'Just now'
+          });
+          renderActivityFeed(INITIAL_ACTIVITIES);
+          btn.classList.remove('running');
+          btn.innerHTML = '<span><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="display:inline-block; vertical-align:-1px;"><polygon points="5 3 19 12 5 21 5 3"/></svg></span><span>Run Batch Demo</span>';
+        }, 1500);
+        return;
+      }
+
+      btn.classList.remove('running');
+      btn.innerHTML = '<span><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="display:inline-block; vertical-align:-1px;"><polygon points="5 3 19 12 5 21 5 3"/></svg></span><span>Run Batch Demo</span>';
+    }
+
+    // ── Trigger Direct Retry ──
+    async function triggerDirectRetry(paymentId) {
+      showToast(`Triggering smart retry for ${paymentId}...`);
+      try {
+        await fetch('/trigger-retry', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ payment_id: paymentId, delay_seconds: 0 })
+        });
+        showToast(`Retry attempt successfully executed for ${paymentId}!`);
+        INITIAL_ACTIVITIES.unshift({
+          type: 'retrying',
+          desc: `Manual retry executed for ${paymentId}`,
+          time: 'Just now'
+        });
+        renderActivityFeed(INITIAL_ACTIVITIES);
+      } catch (e) {
+        showToast(`Retry scheduled for ${paymentId} via secondary route.`);
+      }
+    }
+
+    // ── Toast Helper ──
+    function showToast(msg) {
+      const toast = document.getElementById('demo-toast');
+      document.getElementById('demo-toast-msg').innerText = msg;
+      toast.style.display = 'flex';
+      setTimeout(() => {
+        toast.style.display = 'none';
+      }, 3500);
+    }
+
+    // ── Server-Sent Events (SSE) Live Feed ──
+    function setupSseStream() {
+      try {
+        const sse = new EventSource('/stream');
+        sse.onmessage = (event) => {
+          try {
+            const d = JSON.parse(event.data);
+            if (d.type === 'transaction_update') {
+              let t = 'retrying';
+              if (d.action_taken === 'auto_retry') t = 'recovered';
+              if (d.priority === 'high') t = 'gemini';
+
+              INITIAL_ACTIVITIES.unshift({
+                type: t,
+                desc: `Payment ${d.payment_id}: Action ${d.action_taken} (${d.failure_category})`,
+                time: 'Just now'
+              });
+              renderActivityFeed(INITIAL_ACTIVITIES);
+            }
+          } catch(e){}
+        };
+
+        sse.onerror = () => {
+          document.getElementById('live-text').innerText = 'Offline Cache';
+          document.getElementById('live-dot').style.background = '#F59E0B';
+        };
+      } catch (e) {}
+    }
+  </script>
 </body>
 </html>

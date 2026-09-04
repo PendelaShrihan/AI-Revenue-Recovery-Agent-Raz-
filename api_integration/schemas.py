@@ -145,7 +145,7 @@ class RecoverySuggestionItem(BaseModel):
     failure_code: Optional[str] = None
     suggested_action: str
     retry_count: int = 0
-    max_retries: int = 2
+    max_retries: int = 3
     can_retry: bool = True
     latest_action: Optional[Dict[str, Any]] = None
     created_at: Optional[str] = None

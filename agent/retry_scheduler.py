@@ -29,14 +29,12 @@ MAX_RETRIES = 3
 
 def schedule_retry(
     transaction: Transaction,
-    retry_after_seconds: int,
+    retry_after_seconds: int = 900,
+    force: bool = False,
 ) -> Optional[RetryAttempt]:
-    """Schedule an intelligent retry attempt for a failed transaction.
+    """Schedules a smart retry attempt for a given transaction.
 
-    Rules:
-    - Check retry_attempts table — if transaction already has 3 attempts,
-      stop and call execute_customer_notification() instead — never retry more than 3 times.
-    - Apply exponential backoff on top of Gemini's suggested delay:
+    Applies exponential backoff:
         Attempt 1: retry_after_seconds as-is (1x)
         Attempt 2: retry_after_seconds * 2   (2x)
         Attempt 3: retry_after_seconds * 4   (4x)
@@ -46,6 +44,7 @@ def schedule_retry(
     Args:
         transaction:         The parent Transaction ORM instance.
         retry_after_seconds: Base delay in seconds (from Gemini decision or caller).
+        force:               If True, bypasses max retry guardrail for manual override.
 
     Returns:
         The created RetryAttempt instance, or None if max attempts exceeded.
@@ -63,7 +62,7 @@ def schedule_retry(
         attempts_made = len(existing_attempts)
 
     # 1. Enforce Max 3 Retries Guardrail
-    if attempts_made >= MAX_RETRIES:
+    if attempts_made >= MAX_RETRIES and not force:
         _logger.warning(
             "[RetryScheduler] Max retry limit (%d) reached for tx='%s' (payment_id='%s'). "
             "Blocking further retries and triggering customer notification.",

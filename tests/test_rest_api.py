@@ -248,23 +248,33 @@ def test_trigger_retry_success():
     assert response2.json()["attempt_number"] == 2
     assert response2.json()["result"] == "TRIGGERED"
 
-    # 3rd Retry should be rejected by guardrail (max 2 attempts)
+    # 3rd Retry
     response3 = client.post(
         "/trigger-retry",
         json={"payment_id": payment_id, "delay_seconds": 0},
         headers={"X-API-Key": "test_merchant_key_12345"}
     )
-    assert response3.status_code == 400
-    assert "Maximum retry limit (2 attempts) reached" in response3.json()["detail"]
+    assert response3.status_code == 200
+    assert response3.json()["attempt_number"] == 3
+    assert response3.json()["result"] == "TRIGGERED"
 
-    # 3rd Retry with force=True should bypass guardrail
+    # 4th Retry should be rejected by guardrail (max 3 attempts)
     response4 = client.post(
+        "/trigger-retry",
+        json={"payment_id": payment_id, "delay_seconds": 0},
+        headers={"X-API-Key": "test_merchant_key_12345"}
+    )
+    assert response4.status_code == 400
+    assert "Maximum retry limit (3 attempts) reached" in response4.json()["detail"]
+
+    # 4th Retry with force=True should bypass guardrail
+    response5 = client.post(
         "/trigger-retry",
         json={"payment_id": payment_id, "delay_seconds": 0, "force": True},
         headers={"X-API-Key": "test_merchant_key_12345"}
     )
-    assert response4.status_code == 200
-    assert response4.json()["attempt_number"] == 3
+    assert response5.status_code == 200
+    assert response5.json()["attempt_number"] == 4
 
 
 def test_trigger_retry_nonexistent_transaction():

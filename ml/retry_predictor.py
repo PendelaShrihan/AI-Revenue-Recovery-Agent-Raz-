@@ -89,9 +89,9 @@ class RetryTimingPredictor:
     Predicts optimal retry delay and recovery action for failed payment transactions.
     """
 
-    MAX_RETRIES = 2
+    MAX_RETRIES = 3
 
-    def __init__(self, max_retries: int = 2, tz: Any = None):
+    def __init__(self, max_retries: int = 3, tz: Any = None):
         self.max_retries = max_retries
         self.tz = tz or IST_TZ
 

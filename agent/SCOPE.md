@@ -27,7 +27,7 @@ The MVP focuses strictly on building an autonomous diagnostic and revenue recove
 
 3. **Intelligent Bounded Retry Engine**:
    - Predictive retry delay calculation based on failure category and time-of-day.
-   - Hard stopping rule: **Maximum 2 automated retries per transaction** before state escalation.
+   - Hard stopping rule: **Maximum 3 automated retries per transaction** before state escalation.
    - Elimination of infinite retry loops.
 
 4. **Customer Recovery Notification Drafts**:
@@ -77,6 +77,6 @@ The AI Revenue Recovery Agent processes the following 3 core Razorpay webhook ev
 
 ## 🛡️ Non-Negotiable Operational Guardrails
 
-- **Strict Retry Cap**: `max_retries = 2`.
+- **Strict Retry Cap**: `max_retries = 3`.
 - **State Machine Isolation**: The LLM serves solely as a classification advisor and cannot mutate database records or initiate transactions directly.
 - **Audit Logging**: Every single state change must be persisted in SQL before executing the corresponding action.

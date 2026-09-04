@@ -178,7 +178,7 @@ def generate_llm_notification_message(
         from google.genai import types
 
         client = genai.Client(api_key=gemini_key)
-        model_name = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
+        model_name = os.getenv("GEMINI_MODEL", "gemini-flash-lite-latest")
 
         prompt = (
             f"You are a professional customer retention copywriter for {merchant_name}. "

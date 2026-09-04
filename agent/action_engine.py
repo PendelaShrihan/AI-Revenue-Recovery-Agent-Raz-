@@ -36,6 +36,7 @@ _logger = logging.getLogger(__name__)
 def execute_auto_retry(
     transaction: Transaction,
     retry_after_seconds: int,
+    force: bool = False,
 ) -> RetryAttempt:
     """Schedule an automatic retry for a failed transaction.
 
@@ -45,12 +46,13 @@ def execute_auto_retry(
     Args:
         transaction:         The parent Transaction ORM instance.
         retry_after_seconds: Base delay in seconds from Gemini.
+        force:               If True, bypasses max retry limit for manual override.
 
     Returns:
         The newly created RetryAttempt instance (or existing/last attempt).
     """
     from agent.retry_scheduler import schedule_retry
-    retry = schedule_retry(transaction, retry_after_seconds=retry_after_seconds)
+    retry = schedule_retry(transaction, retry_after_seconds=retry_after_seconds, force=force)
     return retry
 
 
