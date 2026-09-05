@@ -36,20 +36,21 @@ services:
       - ASYNC_DATABASE_URL=postgresql+asyncpg://postgres:postgrespassword@postgres:5432/razorpay_recovery
       - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID}
       - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET}
+      - RAZORPAY_WEBHOOK_SECRET=${RAZORPAY_WEBHOOK_SECRET}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - DEFAULT_LLM_PROVIDER=${DEFAULT_LLM_PROVIDER:-mock}
-      - MAX_RETRY_ATTEMPTS=3
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-flash-lite-latest}
+      - DEFAULT_LLM_PROVIDER=${DEFAULT_LLM_PROVIDER:-gemini}
+      - MAX_RETRY_ATTEMPTS=${MAX_RETRY_ATTEMPTS:-3}
+      - RETRY_BASE_BACKOFF_MINUTES=${RETRY_BASE_BACKOFF_MINUTES:-5}
+      - SIMULATION_MODE=${SIMULATION_MODE:-True}
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
       - ./data:/app/data
       - ./frontend:/app/frontend
-      - ./agent:/app/agent
-      - ./api_integration:/app/api_integration
-      - ./ml:/app/ml
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
