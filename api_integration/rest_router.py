@@ -537,3 +537,29 @@ async def run_demo_endpoint():
         }
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Endpoint 12: POST /demo/walkthrough
+# ─────────────────────────────────────────────────────────────────────────────
+
+@rest_router.post(
+    "/demo/walkthrough",
+    summary="Run 5-Stage Live Walkthrough Demo",
+    description="Simulates the complete 5-stage lifecycle: Payment Fails -> Agent Detects -> Retry Scheduled -> Customer Notified -> Recovered.",
+)
+async def run_walkthrough_endpoint():
+    """Executes the single-transaction live 5-stage recovery walkthrough."""
+    try:
+        from scripts.demo_walkthrough import run_walkthrough
+        import asyncio
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(None, run_walkthrough)
+        return result
+    except Exception as exc:
+        logger.error("[Demo] Error running walkthrough: %s", exc, exc_info=True)
+        return {
+            "status": "error",
+            "message": str(exc)
+        }
+
+
+

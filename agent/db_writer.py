@@ -79,12 +79,24 @@ def get_db_engine(database_url: Optional[str] = None):
         engine = _create_engine_instance(url)
         Base.metadata.create_all(engine)
     except Exception as exc:
-        logger.error(f"Failed to connect to database at '{url}': {exc}")
-        raise RuntimeError(
-            f"Database connection failed for '{url}'. "
-            f"Please verify that the database server is running and credentials in .env are correct. "
-            f"Original error: {exc}"
-        ) from exc
+        if url != DEFAULT_DB_URL:
+            logger.warning(f"Could not connect to database '{url}': {exc}. Falling back to default SQLite DB: {DEFAULT_DB_URL}")
+            try:
+                engine = _create_engine_instance(DEFAULT_DB_URL)
+                Base.metadata.create_all(engine)
+            except Exception as inner_exc:
+                logger.error(f"Failed to connect to fallback database '{DEFAULT_DB_URL}': {inner_exc}")
+                raise RuntimeError(
+                    f"Database connection failed for both '{url}' and fallback '{DEFAULT_DB_URL}'. "
+                    f"Original error: {exc}"
+                ) from inner_exc
+        else:
+            logger.error(f"Failed to connect to database at '{url}': {exc}")
+            raise RuntimeError(
+                f"Database connection failed for '{url}'. "
+                f"Please verify that the database server is running and credentials in .env are correct. "
+                f"Original error: {exc}"
+            ) from exc
 
     _engine = engine
     _SessionFactory = None  # Reset session factory to bind to new engine

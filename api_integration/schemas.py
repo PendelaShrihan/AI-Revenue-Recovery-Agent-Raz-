@@ -43,7 +43,7 @@ class NormalizedEvent(BaseModel):
     entity_type: str = Field(..., description="Primary entity type: payment, subscription, invoice")
     entity_id: str = Field(..., description="Primary identifier (e.g. pay_xxx, sub_xxx, inv_xxx)")
     merchant_id: str = Field(default="unknown", description="Razorpay Account ID / Merchant ID")
-    amount: float = Field(..., description="Normalized monetary amount in standard currency units (e.g. INR)")
+    amount: float = Field(..., gt=0, description="Normalized monetary amount in standard currency units (must be > 0)")
     currency: str = Field(default="INR", description="Three-letter ISO currency code")
     status: str = Field(..., description="Normalized lifecycle status (e.g. FAILED, HALTED, OVERDUE)")
     
@@ -102,7 +102,7 @@ class WebhookResponse(BaseModel):
 class FailureAnalysisRequest(BaseModel):
     """Request model for POST /analyze-failure."""
     payment_id: str = Field(..., description="Razorpay payment ID (e.g. 'pay_ABC123')")
-    amount: float = Field(..., description="Payment amount in standard units (e.g. 2499.00)")
+    amount: float = Field(..., gt=0, description="Payment amount in standard units (must be > 0)")
     currency: str = Field(default="INR", description="Currency code (e.g. 'INR')")
     error_code: Optional[str] = Field(default=None, description="Gateway error code (e.g. 'BAD_REQUEST_ERROR')")
     error_reason: Optional[str] = Field(default=None, description="Specific error reason (e.g. 'insufficient_funds')")

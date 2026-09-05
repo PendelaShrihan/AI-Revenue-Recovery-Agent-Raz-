@@ -141,7 +141,7 @@ def normalize_webhook_payload(raw_payload: Dict[str, Any]) -> NormalizedEvent:
         payment_entity = payment_data.get("entity", {}) if isinstance(payment_data, dict) else {}
 
         payment_id = payment_entity.get("id")
-        amount_paise = payment_entity.get("amount") or sub_entity.get("plan", {}).get("item", {}).get("amount") or 0
+        amount_paise = payment_entity.get("amount") or sub_entity.get("plan", {}).get("item", {}).get("amount") or sub_entity.get("amount") or 0
         amount_in_rupees = _to_rupees(amount_paise)
 
         error_code = payment_entity.get("error_code") or "MANDATE_HALTED"

@@ -291,7 +291,7 @@ def test_recovery_suggestions_auth_rejected():
 # ─────────────────────────────────────────────────────────────────────────────
 
 def test_trigger_retry_full_flow():
-    """Two successful retries → guardrail blocks 3rd → force=True overrides."""
+    """Three successful retries -> guardrail blocks 4th -> force=True overrides."""
     pid = f"pay_RETFL_{_uid()}"
     _insert_tx(pid)
 
@@ -311,19 +311,27 @@ def test_trigger_retry_full_flow():
     assert r2.json()["attempt_number"] == 2
     assert r2.json()["result"] == "TRIGGERED"
 
-    # Attempt 3 — blocked
+    # Attempt 3 — immediate
     r3 = client.post("/trigger-retry",
+                     json={"payment_id": pid, "delay_seconds": 0},
+                     headers=HEADERS)
+    assert r3.status_code == 200
+    assert r3.json()["attempt_number"] == 3
+    assert r3.json()["result"] == "TRIGGERED"
+
+    # Attempt 4 — blocked by max 3 attempts guardrail
+    r4 = client.post("/trigger-retry",
                      json={"payment_id": pid},
                      headers=HEADERS)
-    assert r3.status_code == 400
-    assert "Maximum retry limit" in r3.json()["detail"]
+    assert r4.status_code == 400
+    assert "Maximum retry limit" in r4.json()["detail"]
 
-    # Attempt 3 force — allowed
-    r4 = client.post("/trigger-retry",
+    # Attempt 4 force — allowed
+    r5 = client.post("/trigger-retry",
                      json={"payment_id": pid, "force": True},
                      headers=HEADERS)
-    assert r4.status_code == 200
-    assert r4.json()["attempt_number"] == 3
+    assert r5.status_code == 200
+    assert r5.json()["attempt_number"] == 4
 
 
 def test_trigger_retry_not_found():
@@ -453,7 +461,7 @@ def test_webhook_signed_ingestion(event_type, expected_action):
             "subscription": {
                 "entity": {
                     "id": f"sub_{pid}", "plan_id": "plan_test",
-                    "status": "halted", "charge_at": 1725000000,
+                    "status": "halted", "amount": 49900, "charge_at": 1725000000,
                     "total_count": 12, "paid_count": 3,
                     "current_start": 1724000000, "current_end": 1726000000,
                 }

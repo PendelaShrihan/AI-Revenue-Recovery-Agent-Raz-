@@ -63,7 +63,7 @@ app.include_router(rest_router, prefix="/api")
 def root():
     return {
         "project": "AI Revenue Recovery Agent",
-        "track": "Razorpay Hackathon Track 03",
+        "engine": "Autonomous Revenue Recovery Engine",
         "status": "online",
         "version": "0.1.0",
         "dashboard": "/dashboard/index.html",
